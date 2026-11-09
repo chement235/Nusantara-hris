@@ -1,0 +1,116 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue",
+    Arial, "Noto Sans", sans-serif;
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    @apply bg-slate-50 text-slate-800 antialiased;
+    /* ruang aman notch/status bar untuk mode standalone/PWA */
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  ::selection {
+    @apply bg-indigo-100 text-indigo-900;
+  }
+}
+
+@layer components {
+  .card {
+    @apply rounded-2xl border border-slate-200 bg-white shadow-sm;
+  }
+
+  .card-head {
+    @apply flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 px-4 py-3.5 sm:px-5 sm:py-4;
+  }
+
+  .card-title {
+    @apply text-sm font-semibold text-slate-900;
+  }
+
+  .card-sub {
+    @apply text-xs text-slate-500;
+  }
+
+  .btn {
+    @apply inline-flex min-h-[44px] cursor-pointer items-center justify-center gap-2 whitespace-nowrap rounded-xl px-3.5 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50 sm:min-h-0;
+  }
+
+  .btn-primary {
+    @apply bg-indigo-600 text-white hover:bg-indigo-700 active:bg-indigo-800;
+  }
+
+  .btn-ghost {
+    @apply border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 active:bg-slate-100;
+  }
+
+  .btn-danger {
+    @apply border border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100;
+  }
+
+  .btn-success {
+    @apply border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100;
+  }
+
+  .btn-sm {
+    @apply min-h-[36px] px-2.5 py-1.5 text-xs sm:min-h-0;
+  }
+
+  .input {
+    @apply w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-base text-slate-900 outline-none transition placeholder:text-slate-400 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-100 sm:py-2 sm:text-sm;
+  }
+
+  .label {
+    @apply mb-1.5 block text-xs font-medium text-slate-600;
+  }
+
+  .th {
+    @apply px-4 py-3 text-left text-[11px] font-semibold uppercase tracking-wider text-slate-500;
+  }
+
+  .td {
+    @apply px-4 py-3 text-sm text-slate-700;
+  }
+
+  .badge {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium;
+  }
+
+  .stat-label {
+    @apply text-xs font-medium uppercase tracking-wide text-slate-500;
+  }
+
+  .nav-link {
+    @apply flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-white/10 hover:text-white;
+  }
+
+  .nav-link-active {
+    @apply bg-white/10 text-white;
+  }
+}
+
+@layer utilities {
+  .table-wrap {
+    @apply w-full overflow-x-auto;
+  }
+}
+
+@media print {
+  body {
+    @apply bg-white;
+  }
+
+  .no-print {
+    display: none !important;
+  }
+
+  .card {
+    @apply border-slate-200 shadow-none;
+  }
+}
