@@ -2,16 +2,35 @@ import Link from "next/link";
 import { Card, CardHeader, Field, PageHeader } from "@/components/ui";
 import { createEmployeeAction } from "@/lib/actions";
 import { requireRole } from "@/lib/auth";
-import { all } from "@/lib/db";
+import { all, one } from "@/lib/db";
 import { todayISO } from "@/lib/format";
 
 export default async function NewEmployeePage({
   searchParams,
 }: {
-  searchParams: Promise<{ error?: string }>;
+  searchParams: Promise<{ error?: string; from_applicant?: string }>;
 }) {
   await requireRole(["hr"]);
-  const { error } = await searchParams;
+  const { error, from_applicant } = await searchParams;
+  const applicantId = Number(from_applicant ?? 0);
+  const applicant =
+    Number.isInteger(applicantId) && applicantId > 0
+      ? one<{
+          id: number;
+          full_name: string;
+          email: string;
+          phone: string | null;
+          title: string;
+          department_id: number;
+          employment_type: string;
+        }>(
+          `SELECT a.id, a.full_name, a.email, a.phone, jo.title, jo.department_id, jo.employment_type
+           FROM applicants a
+           JOIN job_openings jo ON jo.id = a.job_opening_id
+           WHERE a.id = ? AND a.stage != 'Ditolak'`,
+          applicantId,
+        )
+      : undefined;
 
   const departments = all<{ id: number; name: string }>(
     "SELECT id, name FROM departments ORDER BY name",
@@ -22,7 +41,14 @@ export default async function NewEmployeePage({
 
   return (
     <>
-      <PageHeader title="Tambah Karyawan" description="Lengkapi data kepegawaian karyawan baru.">
+      <PageHeader
+        title="Tambah Karyawan"
+        description={
+          applicant
+            ? `Penerimaan pelamar: ${applicant.title}`
+            : "Lengkapi data kepegawaian karyawan baru."
+        }
+      >
         <Link href="/karyawan" className="btn btn-ghost">
           Batal
         </Link>
@@ -34,13 +60,40 @@ export default async function NewEmployeePage({
         </div>
       )}
 
+      {applicant && (
+        <div className="mb-5 rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm leading-relaxed text-indigo-800">
+          Melanjutkan penerimaan <strong>{applicant.full_name}</strong> untuk posisi{" "}
+          <strong>{applicant.title}</strong>. Setelah disimpan, pelamar otomatis berstatus
+          “Diterima” di pipeline rekrutmen.
+        </div>
+      )}
+
       <form action={createEmployeeAction} className="space-y-5">
+        {applicant && <input type="hidden" name="applicant_id" value={applicant.id} />}
         <Card>
           <CardHeader title="Data pribadi" subtitle="Informasi dasar karyawan" />
           <div className="grid gap-4 p-5 sm:grid-cols-2">
-            <Field label="Nama lengkap" name="full_name" required placeholder="Nama sesuai KTP" />
-            <Field label="Email perusahaan" name="email" type="email" required placeholder="nama@nusantara.co.id" />
-            <Field label="Nomor telepon" name="phone" placeholder="0812-xxxx-xxxx" />
+            <Field
+              label="Nama lengkap"
+              name="full_name"
+              required
+              placeholder="Nama sesuai KTP"
+              defaultValue={applicant?.full_name}
+            />
+            <Field
+              label="Email perusahaan"
+              name="email"
+              type="email"
+              required
+              placeholder="nama@nusantara.co.id"
+              defaultValue={applicant?.email}
+            />
+            <Field
+              label="Nomor telepon"
+              name="phone"
+              placeholder="0812-xxxx-xxxx"
+              defaultValue={applicant?.phone ?? undefined}
+            />
             <Field label="Tanggal lahir" name="birth_date" type="date" />
             <Field label="Alamat" name="address" placeholder="Jl. ..." className="sm:col-span-2" />
             <div>
@@ -65,7 +118,13 @@ export default async function NewEmployeePage({
               <label className="label" htmlFor="department_id">
                 Departemen
               </label>
-              <select id="department_id" name="department_id" className="input" required>
+              <select
+                id="department_id"
+                name="department_id"
+                className="input"
+                required
+                defaultValue={applicant ? String(applicant.department_id) : ""}
+              >
                 <option value="">Pilih departemen</option>
                 {departments.map((department) => (
                   <option key={department.id} value={department.id}>
@@ -74,7 +133,13 @@ export default async function NewEmployeePage({
                 ))}
               </select>
             </div>
-            <Field label="Jabatan" name="position" required placeholder="Contoh: Backend Engineer" />
+            <Field
+              label="Jabatan"
+              name="position"
+              required
+              placeholder="Contoh: Backend Engineer"
+              defaultValue={applicant?.title}
+            />
             <div>
               <label className="label" htmlFor="job_level">
                 Level jabatan
@@ -91,7 +156,12 @@ export default async function NewEmployeePage({
               <label className="label" htmlFor="employment_type">
                 Jenis kepegawaian
               </label>
-              <select id="employment_type" name="employment_type" className="input" defaultValue="Tetap">
+              <select
+                id="employment_type"
+                name="employment_type"
+                className="input"
+                defaultValue={applicant?.employment_type ?? "Tetap"}
+              >
                 {["Tetap", "Kontrak", "Magang"].map((type) => (
                   <option key={type} value={type}>
                     {type}

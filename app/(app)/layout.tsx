@@ -12,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         <main className="mx-auto w-full max-w-[1200px] flex-1 px-4 py-5 pb-24 md:px-8 md:py-8 md:pb-8">
           {children}
         </main>
-        <MobileBottomNav />
+        <MobileBottomNav user={user} />
       </div>
     </div>
   );

@@ -258,6 +258,7 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
   const phone = String(formData.get("phone") ?? "").trim();
   const birthDate = String(formData.get("birth_date") ?? "");
   const address = String(formData.get("address") ?? "").trim();
+  const applicantId = Number(formData.get("applicant_id") ?? 0);
 
   if (!fullName || !email || !position) {
     fail("/karyawan/baru", "Nama, email, dan jabatan wajib diisi.");
@@ -277,7 +278,7 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
   const nextNumber = last ? Number(last.nip.replace(/\D/g, "")) + 1 : 1;
   const nip = `EMP-${String(nextNumber).padStart(4, "0")}`;
 
-  run(
+  const inserted = run(
     `INSERT INTO employees (
       nip, full_name, email, phone, department_id, position, job_level, employment_type,
       status, join_date, contract_end, manager_id, base_salary, allowance_transport,
@@ -302,6 +303,41 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
     maritalStatus,
   );
 
+  if (applicantId) {
+    const applicant = one<{ id: number; job_opening_id: number; stage: string }>(
+      "SELECT id, job_opening_id, stage FROM applicants WHERE id = ?",
+      applicantId,
+    );
+    if (applicant && applicant.stage !== "Ditolak") {
+      run(
+        "UPDATE applicants SET stage = 'Diterima', employee_id = ? WHERE id = ?",
+        inserted.lastInsertRowid,
+        applicantId,
+      );
+      const opening = one<{ id: number; headcount: number; status: string }>(
+        "SELECT id, headcount, status FROM job_openings WHERE id = ?",
+        applicant.job_opening_id,
+      );
+      const accepted = one<{ c: number }>(
+        "SELECT COUNT(*) AS c FROM applicants WHERE job_opening_id = ? AND stage = 'Diterima'",
+        applicant.job_opening_id,
+      );
+      if (
+        opening &&
+        opening.status === "Dibuka" &&
+        Number(accepted?.c ?? 0) >= Number(opening.headcount)
+      ) {
+        run(
+          "UPDATE job_openings SET status = 'Ditutup', closed_at = ? WHERE id = ?",
+          todayISO(),
+          opening.id,
+        );
+      }
+    }
+    revalidatePath("/rekrutmen");
+    revalidatePath(`/rekrutmen/${applicant?.job_opening_id ?? ""}`);
+  }
+
   revalidatePath("/karyawan");
   revalidatePath("/");
   ok("/karyawan", `Karyawan ${fullName} (${nip}) berhasil ditambahkan.`);
@@ -310,6 +346,22 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
 function payrollTotals(period: string) {
   const { start, end } = monthRange(period);
   const workdays = periodWorkdays(period);
+  const year = period.slice(0, 4);
+
+  // PPh 21 yang sudah dipotong pada periode sebelumnya di tahun yang sama,
+  // dipakai untuk rekonsiliasi masa pajak terakhir (Desember).
+  const priorRows = all<{ employee_id: number; total: number }>(
+    `SELECT p.employee_id, COALESCE(SUM(p.pph21), 0) AS total
+     FROM payslips p
+     JOIN payroll_runs r ON r.id = p.run_id
+     WHERE r.period LIKE ? AND r.period < ?
+     GROUP BY p.employee_id`,
+    `${year}-%`,
+    period,
+  );
+  const priorWithheld = new Map(
+    priorRows.map((row) => [Number(row.employee_id), Number(row.total)]),
+  );
 
   const employees = all<{
     id: number;
@@ -349,7 +401,12 @@ function payrollTotals(period: string) {
     return {
       employee,
       present,
-      calc: computePayslip(employee, { presentDays: present, alphaDays: alpha }),
+      calc: computePayslip(employee, {
+        presentDays: present,
+        alphaDays: alpha,
+        period,
+        priorWithheld: priorWithheld.get(Number(employee.id)) ?? 0,
+      }),
     };
   });
 }
@@ -384,8 +441,9 @@ function insertPayroll(period: string, status: "Draft" | "Final"): number {
       `INSERT INTO payslips (
         run_id, employee_id, present_days, base_salary, allowance_transport, allowance_meal,
         overtime, gross, bpjs_kes, bpjs_jht, bpjs_jp, bpjs_jkk, bpjs_jkm, pph21,
-        alpha_deduction, other_deduction, total_deduction, net
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        alpha_deduction, other_deduction, total_deduction, net,
+        bpjs_base, ter_category, ter_rate, pph21_annual, employer_kes, employer_jht, employer_jp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       runId,
       employee.id,
       present,
@@ -404,6 +462,13 @@ function insertPayroll(period: string, status: "Draft" | "Final"): number {
       calc.other_deduction,
       calc.total_deduction,
       calc.net,
+      calc.bpjs_base,
+      calc.ter_category,
+      calc.ter_rate,
+      calc.pph21_annual,
+      calc.employer_kes,
+      calc.employer_jht,
+      calc.employer_jp,
     );
   }
 
@@ -461,8 +526,9 @@ export async function recalculatePayrollAction(formData: FormData): Promise<void
       `INSERT INTO payslips (
         run_id, employee_id, present_days, base_salary, allowance_transport, allowance_meal,
         overtime, gross, bpjs_kes, bpjs_jht, bpjs_jp, bpjs_jkk, bpjs_jkm, pph21,
-        alpha_deduction, other_deduction, total_deduction, net
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        alpha_deduction, other_deduction, total_deduction, net,
+        bpjs_base, ter_category, ter_rate, pph21_annual, employer_kes, employer_jht, employer_jp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       runId,
       employee.id,
       present,
@@ -481,6 +547,13 @@ export async function recalculatePayrollAction(formData: FormData): Promise<void
       calc.other_deduction,
       calc.total_deduction,
       calc.net,
+      calc.bpjs_base,
+      calc.ter_category,
+      calc.ter_rate,
+      calc.pph21_annual,
+      calc.employer_kes,
+      calc.employer_jht,
+      calc.employer_jp,
     );
   }
 

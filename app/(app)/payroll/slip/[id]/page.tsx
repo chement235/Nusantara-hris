@@ -31,7 +31,14 @@ type SlipDetail = {
   bpjs_jp: number;
   bpjs_jkk: number;
   bpjs_jkm: number;
+  bpjs_base: number;
+  ter_category: "A" | "B" | "C" | null;
+  ter_rate: number;
   pph21: number;
+  pph21_annual: number;
+  employer_kes: number;
+  employer_jht: number;
+  employer_jp: number;
   alpha_deduction: number;
   other_deduction: number;
   total_deduction: number;
@@ -66,20 +73,26 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
     { label: "Tunjangan makan", value: Number(slip.allowance_meal) },
     { label: "Lembur", value: Number(slip.overtime) },
   ];
+  const terPercent = (Number(slip.ter_rate) * 100).toLocaleString("id-ID", {
+    maximumFractionDigits: 2,
+  });
   const deductions = [
-    { label: "BPJS Kesehatan (1%)", value: Number(slip.bpjs_kes) },
-    { label: "BPJS JHT (2%)", value: Number(slip.bpjs_jht) },
-    { label: "BPJS JP (1%)", value: Number(slip.bpjs_jp) },
-    { label: "PPh 21", value: Number(slip.pph21) },
+    { label: "BPJS Kesehatan — 1% pekerja", value: Number(slip.bpjs_kes) },
+    { label: "BPJS JHT — 2% pekerja", value: Number(slip.bpjs_jht) },
+    { label: "BPJS JP — 1% pekerja", value: Number(slip.bpjs_jp) },
+    {
+      label: `PPh 21 — TER ${slip.ter_category ?? "A"} ${terPercent}%`,
+      value: Number(slip.pph21),
+    },
     { label: `Potongan absen (${slip.present_days} hari hadir)`, value: Number(slip.alpha_deduction) },
     { label: "Potongan lain", value: Number(slip.other_deduction) },
   ];
-  const employerContributions = Number(slip.bpjs_jkk) + Number(slip.bpjs_jkm);
-  const totalEmployer =
-    employerContributions +
-    Math.round(Number(slip.base_salary) * 0.04) +
-    Math.round(Number(slip.base_salary) * 0.037) +
-    Math.round(Number(slip.base_salary) * 0.02);
+  const employerTotal =
+    Number(slip.employer_kes) +
+    Number(slip.employer_jht) +
+    Number(slip.employer_jp) +
+    Number(slip.bpjs_jkk) +
+    Number(slip.bpjs_jkm);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -131,6 +144,8 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
             <dd className="text-slate-800">{slip.marital_status}</dd>
             <dt className="text-slate-500">Hadir</dt>
             <dd className="text-slate-800">{slip.present_days} hari</dd>
+            <dt className="text-slate-500">Dasar BPJS</dt>
+            <dd className="text-slate-800">{rupiah(Number(slip.bpjs_base))}</dd>
             <dt className="text-slate-500">Rekening</dt>
             <dd className="text-slate-800">
               {slip.bank_name ? `${slip.bank_name} ${slip.bank_account}` : "—"}
@@ -188,12 +203,14 @@ export default async function PayslipPage({ params }: { params: Promise<{ id: st
         <div className="border-t border-slate-100 px-6 py-4 text-xs text-slate-500">
           <p className="font-medium text-slate-600">Kontribusi perusahaan (di luar take home)</p>
           <p className="mt-1">
-            BPJS Kesehatan 4%, JHT 3,7%, JP 2%, JKK/JKM — estimasi total{" "}
-            {rupiah(totalEmployer + Number(slip.bpjs_jkk) + Number(slip.bpjs_jkm))} per bulan.
+            JKN 4% {rupiah(Number(slip.employer_kes))} · JHT 3,7% {rupiah(Number(slip.employer_jht))} ·
+            JP 2% {rupiah(Number(slip.employer_jp))} · JKK {rupiah(Number(slip.bpjs_jkk))} · JKM{" "}
+            {rupiah(Number(slip.bpjs_jkm))} — total {rupiah(employerTotal)} per bulan.
           </p>
           <p className="mt-3">
             Slip ini dihasilkan otomatis{slip.finalized_at ? ` dan difinalisasi pada ${dateID(slip.finalized_at.slice(0, 10))}` : ""}.
-            Perhitungan pajak bersifat simulasi.
+            PPh 21 memakai TER bulanan (PP 58/2023, PMK 168/2023); estimasi setahun{" "}
+            {rupiah(Number(slip.pph21_annual))} dan direkonsiliasi pada masa pajak Desember.
           </p>
         </div>
       </div>

@@ -118,9 +118,86 @@ export type PayslipRow = {
   bpjs_jp: number;
   bpjs_jkk: number;
   bpjs_jkm: number;
+  bpjs_base: number;
+  ter_category: "A" | "B" | "C" | null;
+  ter_rate: number;
   pph21: number;
+  pph21_annual: number;
+  employer_kes: number;
+  employer_jht: number;
+  employer_jp: number;
   alpha_deduction: number;
   other_deduction: number;
   total_deduction: number;
   net: number;
+};
+
+export type JobOpeningRow = {
+  id: number;
+  title: string;
+  department_id: number;
+  department_name: string;
+  employment_type: string;
+  location: string;
+  description: string | null;
+  requirements: string | null;
+  headcount: number;
+  status: string;
+  opened_at: string;
+  closed_at: string | null;
+  created_by: number | null;
+};
+
+export type ApplicantRow = {
+  id: number;
+  job_opening_id: number;
+  full_name: string;
+  email: string;
+  phone: string | null;
+  source: string | null;
+  stage: string;
+  rating: number | null;
+  notes: string | null;
+  applied_at: string;
+  employee_id: number | null;
+};
+
+export type AppraisalCycleRow = {
+  id: number;
+  name: string;
+  period_start: string;
+  period_end: string;
+  status: string;
+  created_at: string;
+  total: number;
+  done: number;
+};
+
+export type AppraisalRow = {
+  id: number;
+  cycle_id: number;
+  cycle_name: string;
+  period_start: string;
+  period_end: string;
+  employee_id: number;
+  employee_name: string;
+  department_name: string;
+  position: string;
+  reviewer_id: number | null;
+  reviewer_name: string | null;
+  status: string;
+  self_note: string | null;
+  manager_note: string | null;
+  final_score: number | null;
+  rating: string | null;
+  submitted_at: string | null;
+};
+
+export type AppraisalScoreRow = {
+  id: number;
+  appraisal_id: number;
+  criterion: string;
+  weight: number;
+  score: number | null;
+  comment: string | null;
 };

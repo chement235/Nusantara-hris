@@ -248,8 +248,8 @@ export default async function PayrollPage({
               />
             </div>
             <p className="text-[11px] leading-relaxed text-slate-500">
-              Sistem menghitung gaji pokok, tunjangan, BPJS (Kesehatan, JHT, JP), PPh 21 progresif,
-              dan potongan hari tanpa keterangan berdasarkan data absensi periode tersebut.
+              Sistem menghitung gaji pokok, tunjangan, BPJS (JKN 1%, JHT 2%, JP 1% dengan plafon),
+              PPh 21 TER bulanan, dan potongan hari tanpa keterangan (upah ÷ 22) dari data absensi.
             </p>
             <button type="submit" className="btn btn-primary w-full">
               Hitung payroll
@@ -260,6 +260,39 @@ export default async function PayrollPage({
           </form>
         </Card>
       </div>
+
+      <Card className="mt-5">
+        <CardHeader
+          title="Ketentuan perhitungan 2026"
+          subtitle="Dasar iuran dan pajak yang dipakai sistem"
+        />
+        <div className="grid gap-4 p-5 text-xs leading-relaxed text-slate-600 sm:grid-cols-2 lg:grid-cols-3">
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">BPJS Kesehatan (JKN)</p>
+            <p>5% dari upah: 4% pemberi kerja, 1% pekerja. Dasar upah dibatasi Rp12.000.000 (Perpres 59/2024).</p>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">JHT &amp; JP</p>
+            <p>JHT 5,7% (3,7% + 2%) tanpa plafon. JP 3% (2% + 1%) dengan batas upah Rp11.086.300 sejak Maret 2026.</p>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">JKK &amp; JKM</p>
+            <p>JKK 0,24% (risiko sangat rendah, jasa/IT) dan JKM 0,3% — seluruhnya ditanggung perusahaan.</p>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">PPh 21 Januari–November</p>
+            <p>TER bulanan sesuai kategori PTKP (PP 58/2023, PMK 168/2023): A untuk TK/0, TK/1, K/0; B untuk TK/2, TK/3, K/1, K/2; C untuk K/3.</p>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">PPh 21 Desember</p>
+            <p>Penghitungan setahun tarif Pasal 17 UU HPP (biaya jabatan 5%, maks Rp6 jt; PTKP; iuran JHT/JP) dikurangi PPh 21 yang sudah dipotong Januari–November.</p>
+          </div>
+          <div>
+            <p className="mb-1 font-semibold text-slate-800">Potongan absen</p>
+            <p>Hari tanpa keterangan dipotong sebesar upah ÷ 22 per hari, dihitung dari rekap absensi periode.</p>
+          </div>
+        </div>
+      </Card>
     </>
   );
 }

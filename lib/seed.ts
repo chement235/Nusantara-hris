@@ -10,6 +10,7 @@ import {
   todayISO,
 } from "./format";
 import { computePayslip } from "./payroll";
+import { CRITERIA, ratingFor, weightedScore } from "./performance";
 import { hashPassword } from "./password";
 
 type SeedEmployee = {
@@ -104,7 +105,11 @@ function allowanceFor(level: SeedEmployee["level"]): { transport: number; meal: 
 
 export function seedDatabase(conn: DatabaseSync): void {
   const countRow = conn.prepare("SELECT COUNT(*) AS c FROM employees").get() as { c: number };
-  if (Number(countRow.c) > 0) return;
+  if (Number(countRow.c) > 0) {
+    seedRecruitment(conn);
+    seedPerformance(conn);
+    return;
+  }
 
   const today = todayISO();
   const random = mulberry32(20260517);
@@ -433,8 +438,9 @@ export function seedDatabase(conn: DatabaseSync): void {
       INSERT INTO payslips (
         run_id, employee_id, present_days, base_salary, allowance_transport, allowance_meal,
         overtime, gross, bpjs_kes, bpjs_jht, bpjs_jp, bpjs_jkk, bpjs_jkm, pph21,
-        alpha_deduction, other_deduction, total_deduction, net
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        alpha_deduction, other_deduction, total_deduction, net,
+        bpjs_base, ter_category, ter_rate, pph21_annual, employer_kes, employer_jht, employer_jp
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `);
 
     const slips = payrollEmployees.map((employee) => {
@@ -445,7 +451,11 @@ export function seedDatabase(conn: DatabaseSync): void {
       const present = (byStatus.get("Hadir") ?? 0) + (byStatus.get("Terlambat") ?? 0) + (byStatus.get("WFH") ?? 0);
       const excused = (byStatus.get("Cuti") ?? 0) + (byStatus.get("Sakit") ?? 0) + (byStatus.get("Izin") ?? 0);
       const alpha = Math.max(0, previousWorkdays.length - present - excused);
-      const calc = computePayslip(employee, { presentDays: present, alphaDays: alpha });
+      const calc = computePayslip(employee, {
+        presentDays: present,
+        alphaDays: alpha,
+        period,
+      });
       return { employee, present, calc };
     });
 
@@ -489,7 +499,218 @@ export function seedDatabase(conn: DatabaseSync): void {
         calc.other_deduction,
         calc.total_deduction,
         calc.net,
+        calc.bpjs_base,
+        calc.ter_category,
+        calc.ter_rate,
+        calc.pph21_annual,
+        calc.employer_kes,
+        calc.employer_jht,
+        calc.employer_jp,
       );
+    }
+
+    conn.exec("COMMIT");
+  } catch (error) {
+    conn.exec("ROLLBACK");
+    throw error;
+  }
+
+  seedRecruitment(conn);
+  seedPerformance(conn);
+}
+
+function seedRecruitment(conn: DatabaseSync): void {
+  const existing = conn.prepare("SELECT COUNT(*) AS c FROM job_openings").get() as {
+    c: number;
+  };
+  if (Number(existing.c) > 0) return;
+
+  const departmentId = (code: string) =>
+    (conn.prepare("SELECT id FROM departments WHERE code = ?").get(code) as
+      | { id: number }
+      | undefined)?.id;
+  const hr =
+    (conn.prepare("SELECT id FROM employees WHERE email LIKE 'rani.%' LIMIT 1").get() as
+      | { id: number }
+      | undefined)?.id ?? null;
+  const today = todayISO();
+
+  const openings = [
+    {
+      title: "Senior Frontend Engineer",
+      dept: "ENG",
+      type: "Tetap",
+      location: "Jakarta (Hybrid)",
+      headcount: 2,
+      status: "Dibuka",
+      opened: -18,
+      description:
+        "Membangun dan memelihara antarmuka aplikasi HRIS yang dipakai puluhan ribu karyawan klien.",
+      requirements:
+        "Minimal 4 tahun pengalaman React/TypeScript, paham design system, dan terbiasa code review.",
+    },
+    {
+      title: "Payroll Specialist",
+      dept: "FIN",
+      type: "Tetap",
+      location: "Jakarta",
+      headcount: 1,
+      status: "Dibuka",
+      opened: -25,
+      description:
+        "Menjalankan proses payroll bulanan, rekonsiliasi BPJS, dan pelaporan PPh 21.",
+      requirements:
+        "S1 Akuntansi, memahami PPh 21 TER dan BPJS Ketenagakerjaan, teliti dengan angka.",
+    },
+    {
+      title: "Account Executive",
+      dept: "MKT",
+      type: "Kontrak",
+      location: "Surabaya",
+      headcount: 1,
+      status: "Ditutup",
+      opened: -60,
+      closed: -20,
+      description: "Menjaga hubungan klien korporat dan mencapai target penjualan regional timur.",
+      requirements: "Minimal 2 tahun sales B2B, komunikasi kuat, bersedia perjalanan dinas.",
+    },
+  ];
+
+  const applicantSeed = [
+    { opening: 0, name: "Aditya Nugraha", email: "aditya.nugraha@gmail.com", source: "LinkedIn", stage: "Interview", rating: 4, notes: "Portofolio kuat, komunikasi jelas.", applied: -16 },
+    { opening: 0, name: "Bella Kartika", email: "bella.kartika@gmail.com", source: "Job portal", stage: "Screening", rating: 3, notes: "Menunggu hasil tes teknis.", applied: -12 },
+    { opening: 0, name: "Chris Martin", email: "chris.martin@gmail.com", source: "Referral", stage: "Baru", rating: null, notes: null, applied: -5 },
+    { opening: 0, name: "Dinda Ayu", email: "dinda.ayu@gmail.com", source: "Job portal", stage: "Ditolak", rating: 2, notes: "Pengalaman belum sesuai kebutuhan.", applied: -14 },
+    { opening: 1, name: "Eka Suryani", email: "eka.suryani@gmail.com", source: "Job portal", stage: "Penawaran", rating: 5, notes: "Kandidat utama, penawaran dikirim.", applied: -20 },
+    { opening: 1, name: "Fajar Ramadhan", email: "fajar.ramadhan@gmail.com", source: "LinkedIn", stage: "Interview", rating: 4, notes: "Paham TER dan e-Bupot.", applied: -18 },
+    { opening: 1, name: "Gita Permata", email: "gita.permata@gmail.com", source: "Referral", stage: "Ditolak", rating: 2, notes: "Belum berpengalaman payroll massal.", applied: -22 },
+    { opening: 2, name: "Hendra Kusuma", email: "hendra.kusuma@gmail.com", source: "Job portal", stage: "Diterima", rating: 5, notes: "Diterima, kontrak berjalan.", applied: -55 },
+  ];
+
+  conn.exec("BEGIN");
+  try {
+    const insertOpening = conn.prepare(`
+      INSERT INTO job_openings (
+        title, department_id, employment_type, location, description, requirements,
+        headcount, status, opened_at, closed_at, created_by
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const openingIds: number[] = [];
+    for (const opening of openings) {
+      const result = insertOpening.run(
+        opening.title,
+        departmentId(opening.dept) ?? 1,
+        opening.type,
+        opening.location,
+        opening.description,
+        opening.requirements,
+        opening.headcount,
+        opening.status,
+        addDays(today, opening.opened),
+        "closed" in opening && typeof opening.closed === "number"
+          ? addDays(today, opening.closed)
+          : null,
+        hr,
+      );
+      openingIds.push(Number(result.lastInsertRowid));
+    }
+
+    const insertApplicant = conn.prepare(`
+      INSERT INTO applicants (
+        job_opening_id, full_name, email, phone, source, stage, rating, notes, applied_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    applicantSeed.forEach((applicant, index) => {
+      insertApplicant.run(
+        openingIds[applicant.opening],
+        applicant.name,
+        applicant.email,
+        `0813-${String(7000 + index).padStart(4, "0")}-${String(2200 + index * 9).padStart(4, "0")}`,
+        applicant.source,
+        applicant.stage,
+        applicant.rating,
+        applicant.notes,
+        addDays(today, applicant.applied),
+      );
+    });
+
+    conn.exec("COMMIT");
+  } catch (error) {
+    conn.exec("ROLLBACK");
+    throw error;
+  }
+}
+
+function seedPerformance(conn: DatabaseSync): void {
+  const existing = conn.prepare("SELECT COUNT(*) AS c FROM appraisal_cycles").get() as {
+    c: number;
+  };
+  if (Number(existing.c) > 0) return;
+
+  const employees = conn
+    .prepare("SELECT id, manager_id FROM employees WHERE status = 'Aktif' ORDER BY id")
+    .all() as unknown as { id: number; manager_id: number | null }[];
+  if (employees.length === 0) return;
+
+  const hrId =
+    (conn.prepare("SELECT id FROM employees WHERE email LIKE 'rani.%' LIMIT 1").get() as
+      | { id: number }
+      | undefined)?.id ?? null;
+  const today = todayISO();
+
+  conn.exec("BEGIN");
+  try {
+    const cycle = conn
+      .prepare(
+        "INSERT INTO appraisal_cycles (name, period_start, period_end, status, created_at) VALUES (?, ?, ?, 'Berjalan', ?)",
+      )
+      .run(
+        "Penilaian Kinerja Semester II 2026",
+        "2026-07-01",
+        "2026-12-31",
+        `${addDays(today, -14)}T09:00:00`,
+      );
+    const cycleId = Number(cycle.lastInsertRowid);
+
+    const insertAppraisal = conn.prepare(`
+      INSERT INTO appraisals (
+        cycle_id, employee_id, reviewer_id, status, manager_note, final_score, rating, submitted_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `);
+    const insertScore = conn.prepare(`
+      INSERT INTO appraisal_scores (appraisal_id, criterion, weight, score)
+      VALUES (?, ?, ?, ?)
+    `);
+
+    for (const employee of employees) {
+      const reviewerId = employee.manager_id ?? hrId;
+      const completed = employee.id % 3 !== 0;
+      const scores = CRITERIA.map((criterion, index) => ({
+        criterion: criterion.key,
+        score: completed ? 3 + ((employee.id + index) % 3) : null,
+      }));
+      const finalScore = completed ? weightedScore(scores) : null;
+
+      const inserted = insertAppraisal.run(
+        cycleId,
+        employee.id,
+        reviewerId,
+        completed ? "Selesai" : "Menunggu",
+        completed ? "Kinerja konsisten dan komunikasi lintas tim berjalan baik." : null,
+        finalScore,
+        finalScore === null ? null : ratingFor(finalScore),
+        completed ? `${addDays(today, -7)}T15:30:00` : null,
+      );
+      const appraisalId = Number(inserted.lastInsertRowid);
+
+      for (const [index, criterion] of CRITERIA.entries()) {
+        insertScore.run(
+          appraisalId,
+          criterion.key,
+          criterion.weight,
+          completed ? 3 + ((employee.id + index) % 3) : null,
+        );
+      }
     }
 
     conn.exec("COMMIT");

@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { ROLE_LABEL, type SessionUser } from "@/lib/types";
 import { initials } from "@/lib/format";
 import { Icon, type IconName } from "./icons";
@@ -19,6 +20,13 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { href: "/karyawan", label: "Data Karyawan", short: "Karyawan", icon: "users" as const },
       { href: "/kehadiran", label: "Kehadiran", short: "Absen", icon: "clock" as const },
       { href: "/cuti", label: "Cuti & Izin", short: "Cuti", icon: "calendar" as const },
+    ],
+  },
+  {
+    label: "Talent",
+    items: [
+      { href: "/rekrutmen", label: "Rekrutmen", short: "Rekrutmen", icon: "briefcase" as const },
+      { href: "/kinerja", label: "Penilaian Kinerja", short: "Kinerja", icon: "check" as const },
     ],
   },
   {
@@ -121,40 +129,127 @@ export function MobileNav({ user }: { user: SessionUser }) {
   );
 }
 
-export function MobileBottomNav() {
+const BOTTOM_PRIMARY: NavItem[] = [
+  { href: "/", label: "Dashboard", short: "Beranda", icon: "dashboard" as const },
+  { href: "/karyawan", label: "Data Karyawan", short: "Karyawan", icon: "users" as const },
+  { href: "/kehadiran", label: "Kehadiran", short: "Absen", icon: "clock" as const },
+  { href: "/cuti", label: "Cuti & Izin", short: "Cuti", icon: "calendar" as const },
+];
+
+const BOTTOM_MORE: NavItem[] = [
+  { href: "/payroll", label: "Payroll & slip gaji", short: "Payroll", icon: "wallet" as const },
+  { href: "/rekrutmen", label: "Rekrutmen", short: "Rekrutmen", icon: "briefcase" as const },
+  { href: "/kinerja", label: "Penilaian kinerja", short: "Kinerja", icon: "check" as const },
+];
+
+export function MobileBottomNav({ user }: { user: SessionUser }) {
   const pathname = usePathname();
-  const items = SECTIONS.flatMap((section) => section.items);
+  const [open, setOpen] = useState(false);
+  const moreActive = BOTTOM_MORE.some((item) => isActive(pathname, item.href));
 
   return (
-    <nav
-      className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
-      style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
-      aria-label="Navigasi utama"
-    >
-      <ul className="mx-auto grid max-w-lg grid-cols-5">
-        {items.map((item) => {
-          const active = isActive(pathname, item.href);
-          return (
-            <li key={item.href}>
-              <Link
-                href={item.href}
-                className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[10px] font-medium transition-colors ${
-                  active ? "text-indigo-600" : "text-slate-500 active:text-slate-700"
-                }`}
-              >
-                <span
-                  className={`grid h-7 w-10 place-items-center rounded-full ${
-                    active ? "bg-indigo-50" : ""
+    <>
+      {open && (
+        <div className="fixed inset-0 z-40 md:hidden" role="dialog" aria-modal="true" aria-label="Menu lainnya">
+          <button
+            type="button"
+            className="absolute inset-0 cursor-default bg-slate-900/40"
+            aria-label="Tutup menu"
+            onClick={() => setOpen(false)}
+          />
+          <div
+            className="absolute inset-x-0 bottom-0 rounded-t-2xl bg-white p-4 shadow-xl"
+            style={{ paddingBottom: "calc(1rem + env(safe-area-inset-bottom, 0px))" }}
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-200" aria-hidden="true" />
+            <div className="mb-3 flex items-center gap-3 rounded-xl bg-slate-50 px-3 py-2.5">
+              <span className="grid h-9 w-9 place-items-center rounded-full bg-indigo-100 text-xs font-semibold text-indigo-700">
+                {initials(user.name)}
+              </span>
+              <div className="min-w-0 leading-tight">
+                <p className="truncate text-sm font-medium text-slate-900">{user.name}</p>
+                <p className="truncate text-[11px] text-slate-500">{ROLE_LABEL[user.role]}</p>
+              </div>
+            </div>
+            <ul className="space-y-1">
+              {BOTTOM_MORE.map((item) => (
+                <li key={item.href}>
+                  <Link
+                    href={item.href}
+                    onClick={() => setOpen(false)}
+                    className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+                  >
+                    <Icon name={item.icon} className="h-5 w-5 text-slate-500" />
+                    {item.label}
+                    <span className="ml-auto text-slate-300">›</span>
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link
+                  href={`/karyawan/${user.employeeId}`}
+                  onClick={() => setOpen(false)}
+                  className="flex items-center gap-3 rounded-xl px-3 py-3 text-sm font-medium text-slate-700 hover:bg-slate-50 active:bg-slate-100"
+                >
+                  <Icon name="user" className="h-5 w-5 text-slate-500" />
+                  Profil saya
+                  <span className="ml-auto text-slate-300">›</span>
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+      )}
+
+      <nav
+        className="no-print fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 backdrop-blur md:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+        aria-label="Navigasi utama"
+      >
+        <ul className="mx-auto grid max-w-lg grid-cols-5">
+          {BOTTOM_PRIMARY.map((item) => {
+            const active = isActive(pathname, item.href);
+            return (
+              <li key={item.href}>
+                <Link
+                  href={item.href}
+                  className={`flex min-h-[56px] flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[10px] font-medium transition-colors ${
+                    active ? "text-indigo-600" : "text-slate-500 active:text-slate-700"
                   }`}
                 >
-                  <Icon name={item.icon} className="h-[20px] w-[20px]" />
-                </span>
-                <span>{item.short}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </nav>
+                  <span
+                    className={`grid h-7 w-10 place-items-center rounded-full ${
+                      active ? "bg-indigo-50" : ""
+                    }`}
+                  >
+                    <Icon name={item.icon} className="h-[20px] w-[20px]" />
+                  </span>
+                  <span>{item.short}</span>
+                </Link>
+              </li>
+            );
+          })}
+          <li>
+            <button
+              type="button"
+              onClick={() => setOpen((value) => !value)}
+              aria-expanded={open}
+              className={`flex min-h-[56px] w-full cursor-pointer flex-col items-center justify-center gap-0.5 px-1 pt-1.5 text-[10px] font-medium transition-colors ${
+                moreActive ? "text-indigo-600" : "text-slate-500 active:text-slate-700"
+              }`}
+            >
+              <span
+                className={`grid h-7 w-10 place-items-center rounded-full ${
+                  moreActive ? "bg-indigo-50" : ""
+                }`}
+              >
+                <Icon name="plus" className="h-[20px] w-[20px]" />
+              </span>
+              <span>Menu</span>
+            </button>
+          </li>
+        </ul>
+      </nav>
+    </>
   );
 }

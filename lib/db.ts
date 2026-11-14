@@ -113,11 +113,98 @@ CREATE TABLE IF NOT EXISTS payslips (
   UNIQUE (run_id, employee_id)
 );
 
+CREATE TABLE IF NOT EXISTS job_openings (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  title TEXT NOT NULL,
+  department_id INTEGER NOT NULL REFERENCES departments(id),
+  employment_type TEXT NOT NULL DEFAULT 'Tetap',
+  location TEXT NOT NULL DEFAULT 'Jakarta',
+  description TEXT,
+  requirements TEXT,
+  headcount INTEGER NOT NULL DEFAULT 1,
+  status TEXT NOT NULL DEFAULT 'Dibuka',
+  opened_at TEXT NOT NULL,
+  closed_at TEXT,
+  created_by INTEGER REFERENCES employees(id)
+);
+
+CREATE TABLE IF NOT EXISTS applicants (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  job_opening_id INTEGER NOT NULL REFERENCES job_openings(id) ON DELETE CASCADE,
+  full_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  phone TEXT,
+  source TEXT,
+  stage TEXT NOT NULL DEFAULT 'Baru',
+  rating INTEGER,
+  notes TEXT,
+  applied_at TEXT NOT NULL,
+  employee_id INTEGER REFERENCES employees(id),
+  UNIQUE (job_opening_id, email)
+);
+
+CREATE TABLE IF NOT EXISTS appraisal_cycles (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  period_start TEXT NOT NULL,
+  period_end TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'Berjalan',
+  created_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS appraisals (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  cycle_id INTEGER NOT NULL REFERENCES appraisal_cycles(id) ON DELETE CASCADE,
+  employee_id INTEGER NOT NULL REFERENCES employees(id),
+  reviewer_id INTEGER REFERENCES employees(id),
+  status TEXT NOT NULL DEFAULT 'Menunggu',
+  self_note TEXT,
+  manager_note TEXT,
+  final_score REAL,
+  rating TEXT,
+  submitted_at TEXT,
+  UNIQUE (cycle_id, employee_id)
+);
+
+CREATE TABLE IF NOT EXISTS appraisal_scores (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  appraisal_id INTEGER NOT NULL REFERENCES appraisals(id) ON DELETE CASCADE,
+  criterion TEXT NOT NULL,
+  weight REAL NOT NULL DEFAULT 0,
+  score INTEGER,
+  comment TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_attendance_date ON attendance (date);
 CREATE INDEX IF NOT EXISTS idx_attendance_employee ON attendance (employee_id, date);
 CREATE INDEX IF NOT EXISTS idx_leave_employee ON leave_requests (employee_id, status);
 CREATE INDEX IF NOT EXISTS idx_payslip_run ON payslips (run_id);
+CREATE INDEX IF NOT EXISTS idx_applicant_opening ON applicants (job_opening_id, stage);
+CREATE INDEX IF NOT EXISTS idx_appraisal_cycle ON appraisals (cycle_id, status);
+CREATE INDEX IF NOT EXISTS idx_appraisal_employee ON appraisals (employee_id);
 `;
+
+/** Kolom baru pada payslips untuk perhitungan BPJS/PPh 21 sesuai aturan 2026. */
+const PAYSLIP_MIGRATIONS: [column: string, definition: string][] = [
+  ["bpjs_base", "INTEGER NOT NULL DEFAULT 0"],
+  ["ter_category", "TEXT"],
+  ["ter_rate", "REAL NOT NULL DEFAULT 0"],
+  ["pph21_annual", "INTEGER NOT NULL DEFAULT 0"],
+  ["employer_kes", "INTEGER NOT NULL DEFAULT 0"],
+  ["employer_jht", "INTEGER NOT NULL DEFAULT 0"],
+  ["employer_jp", "INTEGER NOT NULL DEFAULT 0"],
+];
+
+function migrate(connection: DatabaseSync): void {
+  const columns = connection.prepare("PRAGMA table_info(payslips)").all() as unknown as {
+    name: string;
+  }[];
+  const existing = new Set(columns.map((column) => column.name));
+  for (const [column, definition] of PAYSLIP_MIGRATIONS) {
+    if (existing.has(column)) continue;
+    connection.exec(`ALTER TABLE payslips ADD COLUMN ${column} ${definition}`);
+  }
+}
 
 type GlobalWithDb = typeof globalThis & { __hrisDb?: DatabaseSync };
 
@@ -136,6 +223,7 @@ export function db(): DatabaseSync {
   connection.exec("PRAGMA journal_mode = WAL;");
   connection.exec("PRAGMA foreign_keys = ON;");
   connection.exec(SCHEMA);
+  migrate(connection);
   seedDatabase(connection);
 
   globalRef.__hrisDb = connection;

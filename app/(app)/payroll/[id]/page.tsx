@@ -98,7 +98,7 @@ export default async function PayrollDetailPage({
           <EmptyState title="Belum ada slip" description="Hitung ulang payroll untuk mengisi data." />
         ) : (
           <div className="overflow-x-auto">
-            <table className="w-full min-w-[900px]">
+            <table className="w-full min-w-[980px]">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="th">Karyawan</th>
@@ -108,6 +108,7 @@ export default async function PayrollDetailPage({
                   <th className="th">Bruto</th>
                   <th className="th">PPh 21</th>
                   <th className="th">BPJS</th>
+                  <th className="th">TER</th>
                   <th className="th">Potongan absen</th>
                   <th className="th">Net</th>
                   <th className="th" />
@@ -134,6 +135,11 @@ export default async function PayrollDetailPage({
                       <td className="td">{rupiah(Number(slip.gross))}</td>
                       <td className="td">{rupiah(Number(slip.pph21))}</td>
                       <td className="td">{rupiah(bpjs)}</td>
+                      <td className="td text-slate-600">
+                        {slip.ter_category
+                          ? `${slip.ter_category} · ${(Number(slip.ter_rate) * 100).toLocaleString("id-ID", { maximumFractionDigits: 2 })}%`
+                          : "—"}
+                      </td>
                       <td className="td">{rupiah(Number(slip.alpha_deduction))}</td>
                       <td className="td font-medium text-slate-900">{rupiah(Number(slip.net))}</td>
                       <td className="td text-right">
@@ -158,6 +164,7 @@ export default async function PayrollDetailPage({
                   <td className="td font-semibold text-slate-900">{rupiah(totalPph)}</td>
                   <td className="td font-semibold text-slate-900">{rupiah(totalBpjs)}</td>
                   <td className="td" />
+                  <td className="td" />
                   <td className="td font-semibold text-slate-900">{rupiah(Number(payrollRun.total_net))}</td>
                   <td className="td" />
                 </tr>
@@ -167,9 +174,11 @@ export default async function PayrollDetailPage({
         )}
       </Card>
 
-      <p className="mt-3 text-xs text-slate-500">
-        Perhitungan memakai tarif BPJS dan PPh 21 progresif yang disederhanakan untuk keperluan
-        demo. Untuk produksi, gunakan tarif resmi terbaru dan konsultasikan dengan konsultan pajak.
+      <p className="mt-3 text-xs leading-relaxed text-slate-500">
+        Perhitungan mengikuti aturan 2026: JKN 5% (batas upah Rp12 jt), JHT 5,7%, JP 3% (batas
+        Rp11.086.300), JKK/JKM ditanggung perusahaan, dan PPh 21 memakai TER bulanan (PP 58/2023).
+        Pada masa pajak Desember, PPh 21 dihitung setahun dengan tarif Pasal 17 lalu dikurangi
+        potongan Januari–November. Angka tetap perlu direview tim pajak sebelum pembayaran gaji.
       </p>
     </>
   );
