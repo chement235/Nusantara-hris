@@ -123,3 +123,15 @@ pemberitahuan privasi, pemetaan masa retensi per kategori data (mis. data pelama
 payroll, slip gaji, penilaian) berikut jadwal penghapusan/anonymisasi, prosedur pemenuhan hak
 subjek data (akses, koreksi, penghapusan, pembatasan), pencatatan insiden kebocoran beserta
 notifikasi ke lembaga pengawas/subjek data, serta perjanjian pemroses bila ada pihak ketiga.
+
+## Pengujian
+
+- **Unit test** (`npm test`) memverifikasi angka payroll 2026 (BPJS JKN/JHT/JP, plafon, kategori &
+  tarif TER, rekonsiliasi Desember dari YTD aktual, prorata mid-year, PPh 21 progresif).
+- **E2E Playwright** (`npm run test:e2e`) menjalankan server dev di port 3100 dengan database
+  sekali-pakai (`/tmp/nusantara-hris-test.db`) lalu menguji login, RBAC per peran, penyamaran PII,
+  dan alur absen masuk/pulang karyawan. Browser membutuhkan dependensi sistem Playwright
+  (`npx playwright install --with-deps chromium`) — di sandbox cloud tanpa akses root, gunakan uji
+  jalur nyata lewat panel browser.
+- **CI** (`.github/workflows/ci.yml`) menjalankan typecheck, build, unit test, dan E2E pada
+  push ke `main` dan pull request.

@@ -12,3 +12,6 @@ tsconfig.tsbuildinfo
 /freebuff-sites-build/
 /.open-next/
 /.wrangler/
+/test-results/
+/playwright-report/
+/blob-report/
