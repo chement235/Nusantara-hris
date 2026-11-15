@@ -19,12 +19,12 @@ export default async function EmployeeDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
-  await requireSession();
+  const session = await requireSession();
   const { id } = await params;
   const employeeId = Number(id);
-  if (!Number.isFinite(employeeId)) notFound();
+  if (!Number.isFinite(employeeId) || employeeId <= 0) notFound();
 
-  const employee = one<EmployeeRow>(
+  const employee = one<EmployeeRow & { manager_id: number | null }>(
     `SELECT e.*, d.name AS department_name, d.code AS department_code,
             m.full_name AS manager_name
      FROM employees e
@@ -34,6 +34,18 @@ export default async function EmployeeDetailPage({
     employeeId,
   );
   if (!employee) notFound();
+
+  // PII: hanya HR, atasan langsung, atau pemilik data sendiri yang melihat nilai penuh.
+  const canSeeFullPii =
+    session.role === "hr" ||
+    employeeId === session.employeeId ||
+    Number(employee.manager_id) === session.employeeId;
+
+  const mask = (value: string | null | undefined, keep = 4): string => {
+    if (!value) return "—";
+    if (value.length <= keep + 2) return "•".repeat(value.length);
+    return `${value.slice(0, keep)}${"•".repeat(Math.max(2, value.length - keep))}`;
+  };
 
   const today = todayISO();
   const yearStart = `${today.slice(0, 4)}-01-01`;
@@ -167,11 +179,29 @@ export default async function EmployeeDetailPage({
               ["Jabatan", employee.position],
               ["Level", employee.job_level],
               ["Email", employee.email],
-              ["Telepon", employee.phone ?? "—"],
-              ["Rekening", employee.bank_name ? `${employee.bank_name} ${employee.bank_account}` : "—"],
-              ["NPWP", employee.npwp ?? "—"],
+              ["Telepon", canSeeFullPii ? (employee.phone ?? "—") : mask(employee.phone)],
+              [
+                "Rekening",
+                canSeeFullPii
+                  ? employee.bank_name
+                    ? `${employee.bank_name} ${employee.bank_account}`
+                    : "—"
+                  : employee.bank_account
+                    ? mask(employee.bank_account)
+                    : "—",
+              ],
+              ["NPWP", canSeeFullPii ? (employee.npwp ?? "—") : mask(employee.npwp)],
               ["Berakhir kontrak", employee.contract_end ? dateID(employee.contract_end) : "Tidak ada (karyawan tetap)"],
-              ["Tanggal lahir", employee.birth_date ? dateID(employee.birth_date) : "—"],
+              [
+                "Tanggal lahir",
+                canSeeFullPii
+                  ? employee.birth_date
+                    ? dateID(employee.birth_date)
+                    : "—"
+                  : employee.birth_date
+                    ? mask(employee.birth_date.slice(0, 7), 3)
+                    : "—",
+              ],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt className="text-[11px] uppercase tracking-wider text-slate-400">{label}</dt>
@@ -182,7 +212,9 @@ export default async function EmployeeDetailPage({
           {employee.address && (
             <div className="border-t border-slate-100 px-5 py-4">
               <p className="text-[11px] uppercase tracking-wider text-slate-400">Alamat</p>
-              <p className="mt-0.5 text-sm text-slate-800">{employee.address}</p>
+              <p className="mt-0.5 text-sm text-slate-800">
+                {canSeeFullPii ? employee.address : mask(employee.address, 8)}
+              </p>
             </div>
           )}
         </Card>

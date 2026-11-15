@@ -6,6 +6,7 @@ import { all, one, run } from "./db";
 import { requireRole, requireSession } from "./auth";
 import { isISODate } from "./format";
 import { CRITERIA, ratingFor, weightedScore } from "./performance";
+import { auditLog } from "./security";
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -16,7 +17,7 @@ function ok(path: string, message: string): never {
 }
 
 export async function createCycleAction(formData: FormData): Promise<void> {
-  await requireRole(["hr"]);
+  const session = await requireRole(["hr"]);
   const name = String(formData.get("name") ?? "").trim();
   const periodStart = String(formData.get("period_start") ?? "");
   const periodEnd = String(formData.get("period_end") ?? "");
@@ -63,6 +64,14 @@ export async function createCycleAction(formData: FormData): Promise<void> {
   }
 
   revalidatePath("/kinerja");
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: "hr",
+    action: "performance.cycle.create",
+    targetType: "appraisal_cycle",
+    targetId: String(cycle.id),
+    details: `${name} · ${employees.length} karyawan`,
+  });
   ok("/kinerja", `Siklus "${name}" dibuat untuk ${employees.length} karyawan.`);
 }
 
@@ -96,8 +105,15 @@ export async function saveAppraisalAction(formData: FormData): Promise<void> {
     score: Number(formData.get(`score_${criterion.key}`) ?? 0),
   }));
 
-  if (scores.some((row) => !Number.isInteger(row.score) || row.score < 1 || row.score > 5)) {
+  if (
+    scores.some(
+      (row) => !Number.isFinite(row.score) || !Number.isInteger(row.score) || row.score < 1 || row.score > 5,
+    )
+  ) {
     fail(back, "Semua kriteria harus dinilai dengan skala 1–5.");
+  }
+  if (managerNote.length > 1000) {
+    fail(back, "Catatan penilaian maksimal 1000 karakter.");
   }
   if (managerNote.length < 10) {
     fail(back, "Catatan penilaian minimal 10 karakter agar umpan balik bermakna.");
@@ -128,5 +144,13 @@ export async function saveAppraisalAction(formData: FormData): Promise<void> {
 
   revalidatePath("/kinerja");
   revalidatePath(back);
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: session.role,
+    action: "performance.appraisal.save",
+    targetType: "appraisal",
+    targetId: String(appraisalId),
+    details: `nilai ${finalScore.toFixed(2)}`,
+  });
   ok(back, "Penilaian kinerja disimpan dan difinalisasi.");
 }

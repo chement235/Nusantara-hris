@@ -54,3 +54,37 @@ serta tarif Pasal 17 UU HPP untuk penghitungan setahun. JKK memakai kelas risiko
 Rekonsiliasi PPh 21 Desember mengasumsikan penghasilan bulanan setara sepanjang tahun dan
 membutuhkan payroll Januari–November pada tahun yang sama. Tetap validasi dengan konsultan pajak
 sebelum dipakai untuk penggajian nyata. Aplikasi ini tidak terafiliasi dengan DataOn/SunFish.
+
+## Keamanan & data
+
+- **Rahasia sesi (wajib).** Set env `SESSION_SECRET` dengan nilai acak minimal 32 byte sebelum
+  menjalankan aplikasi; tanpa nilai ini autentikasi sengaja gagal (fail-closed). Untuk dev lokal
+  nilai dummy dapat ditaruh di `.env.local` (tidak di-commit). Jangan pernah meng-commit secret.
+- **Sesi & cookie.** Cookie sesi `HttpOnly`, `SameSite=Lax`, `Path=/`, berumur 7 hari, dan
+  `Secure` + prefix `__Host-` saat `NODE_ENV=production`. Sesi memakai `jti` yang dicabut saat
+  logout (`revoked_sessions`), sehingga token lama tidak dapat dipakai ulang.
+- **Login & CSRF.** `POST /api/login` dan `/logout` menolak request dengan Origin/Referer yang
+  tidak cocok dengan Host (lapisan di `proxy.ts` dan di route). Login memiliki rate limit & kunci
+  sementara per `IP|email` (`login_attempts`).
+- **PII.** Nomor telepon, rekening, NPWP, tanggal lahir, dan alamat hanya tampil utuh untuk HR,
+  atasan langsung, atau pemilik data; peran lain melihat versi tersamar.
+- **Header keamanan.** `X-Content-Type-Options`, `Referrer-Policy`, `X-Frame-Options`, CSP
+  (`frame-ancestors 'none'`, `object-src 'none'`, `base-uri`/`form-action 'self'`),
+  `Permissions-Policy`, dan HSTS di produksi.
+- **Audit trail.** Aksi sensitif (login sukses/gagal/terkunci, perubahan data karyawan, keputusan
+  cuti, payroll dibuat/dihitung ulang/difinalisasi, rekrutmen, penilaian kinerja) dicatat di tabel
+  `audit_logs` dengan aktor, peran, target, detail, dan IP.
+- **Database.** SQLite lokal di `data/hris.db` (diabaikan Git; jangan pernah meng-commit isinya).
+  Data tersimpan plaintext di filesystem, jadi amankan mesin/volume dengan enkripsi disk
+  (mis. LUKS/filevault/encrypted volume), batasi izin baca file DB, dan jalankan backup terenkripsi
+  berkala beserta uji restore. Jangan backup langsung dari file yang sedang ditulis; gunakan
+  `sqlite3 data/hris.db ".backup 'backup-YYYYMMDD.db'"` atau snapshot filesystem yang konsisten.
+
+### Kesesuaian UU PDP
+
+Demo ini tidak menggantikan penilaian hukum. Untuk pemakaian nyata, lengkapi paling tidak: dasar
+pemrosesan data pribadi karyawan/pelamar (kontrak kerja, kewajiban hukum, dan/atau persetujuan),
+pemberitahuan privasi, pemetaan masa retensi per kategori data (mis. data pelamar, absensi,
+payroll, slip gaji, penilaian) berikut jadwal penghapusan/anonymisasi, prosedur pemenuhan hak
+subjek data (akses, koreksi, penghapusan, pembatasan), pencatatan insiden kebocoran beserta
+notifikasi ke lembaga pengawas/subjek data, serta perjanjian pemroses bila ada pihak ketiga.

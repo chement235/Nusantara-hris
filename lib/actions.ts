@@ -14,6 +14,18 @@ import {
   todayISO,
 } from "./format";
 import { computePayslip, periodWorkdays } from "./payroll";
+import { auditLog } from "./security";
+
+const EMPLOYMENT_TYPES = ["Tetap", "Kontrak", "Magang"] as const;
+const JOB_LEVELS = ["Staff", "Supervisor", "Manager", "Direktur"] as const;
+const MARITAL_STATUSES = ["TK/0", "TK/1", "TK/2", "TK/3", "K/0", "K/1", "K/2", "K/3"] as const;
+
+function intValue(value: FormDataEntryValue | null): number | null {
+  if (value === null || value === "") return null;
+  const number = Number(value);
+  if (!Number.isFinite(number) || !Number.isInteger(number)) return null;
+  return number;
+}
 
 function fail(path: string, message: string): never {
   redirect(`${path}?error=${encodeURIComponent(message)}`);
@@ -236,37 +248,71 @@ export async function decideLeaveAction(formData: FormData): Promise<void> {
   revalidatePath("/cuti");
   revalidatePath("/");
   revalidatePath("/kehadiran");
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: session.role,
+    action: "leave.decide",
+    targetType: "leave_request",
+    targetId: String(requestId),
+    details: `${decision} · ${note || "tanpa catatan"}`,
+  });
   ok("/cuti", `Pengajuan ${decision.toLowerCase()}.`);
 }
 
 export async function createEmployeeAction(formData: FormData): Promise<void> {
-  await requireRole(["hr"]);
+  const session = await requireRole(["hr"]);
 
   const fullName = String(formData.get("full_name") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const position = String(formData.get("position") ?? "").trim();
-  const departmentId = Number(formData.get("department_id") ?? 0);
+  const departmentId = intValue(formData.get("department_id"));
   const joinDate = String(formData.get("join_date") ?? "");
   const employmentType = String(formData.get("employment_type") ?? "Tetap");
   const jobLevel = String(formData.get("job_level") ?? "Staff");
-  const baseSalary = Number(formData.get("base_salary") ?? 0);
-  const transport = Number(formData.get("allowance_transport") ?? 0);
-  const meal = Number(formData.get("allowance_meal") ?? 0);
+  const baseSalary = intValue(formData.get("base_salary"));
+  const transport = intValue(formData.get("allowance_transport")) ?? 0;
+  const meal = intValue(formData.get("allowance_meal")) ?? 0;
   const contractEnd = String(formData.get("contract_end") ?? "");
-  const managerId = Number(formData.get("manager_id") ?? 0);
+  const managerId = intValue(formData.get("manager_id"));
   const maritalStatus = String(formData.get("marital_status") ?? "TK/0");
   const phone = String(formData.get("phone") ?? "").trim();
   const birthDate = String(formData.get("birth_date") ?? "");
   const address = String(formData.get("address") ?? "").trim();
-  const applicantId = Number(formData.get("applicant_id") ?? 0);
+  const applicantId = intValue(formData.get("applicant_id")) ?? 0;
 
   if (!fullName || !email || !position) {
     fail("/karyawan/baru", "Nama, email, dan jabatan wajib diisi.");
   }
-  if (!email.includes("@")) fail("/karyawan/baru", "Format email tidak valid.");
-  if (!departmentId) fail("/karyawan/baru", "Pilih departemen.");
+  if (fullName.length > 120) fail("/karyawan/baru", "Nama maksimal 120 karakter.");
+  if (email.length > 160 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    fail("/karyawan/baru", "Format email tidak valid.");
+  }
+  if (phone.length > 30) fail("/karyawan/baru", "Nomor telepon terlalu panjang.");
+  if (position.length > 80) fail("/karyawan/baru", "Jabatan maksimal 80 karakter.");
+  if (address.length > 300) fail("/karyawan/baru", "Alamat maksimal 300 karakter.");
+  if (departmentId === null || departmentId <= 0) fail("/karyawan/baru", "Pilih departemen.");
+  if (!(EMPLOYMENT_TYPES as readonly string[]).includes(employmentType)) {
+    fail("/karyawan/baru", "Jenis kepegawaian tidak valid.");
+  }
+  if (!(JOB_LEVELS as readonly string[]).includes(jobLevel)) {
+    fail("/karyawan/baru", "Jenjang jabatan tidak valid.");
+  }
+  if (!(MARITAL_STATUSES as readonly string[]).includes(maritalStatus)) {
+    fail("/karyawan/baru", "Status PTKP tidak valid.");
+  }
   if (!isISODate(joinDate)) fail("/karyawan/baru", "Tanggal bergabung tidak valid.");
-  if (baseSalary <= 0) fail("/karyawan/baru", "Gaji pokok harus lebih dari 0.");
+  if (baseSalary === null || baseSalary <= 0) {
+    fail("/karyawan/baru", "Gaji pokok harus lebih dari 0.");
+  }
+  if (baseSalary > 5_000_000_000) fail("/karyawan/baru", "Gaji pokok melebihi batas wajar.");
+  if (transport < 0 || meal < 0) fail("/karyawan/baru", "Tunjangan tidak boleh negatif.");
+  if (transport > 1_000_000_000 || meal > 1_000_000_000) {
+    fail("/karyawan/baru", "Tunjangan melebihi batas wajar.");
+  }
+  if (managerId !== null && managerId > 0) {
+    const manager = one<{ id: number }>("SELECT id FROM employees WHERE id = ?", managerId);
+    if (!manager) fail("/karyawan/baru", "Atasan tidak ditemukan.");
+  }
   if (employmentType !== "Tetap" && !isISODate(contractEnd)) {
     fail("/karyawan/baru", "Tanggal berakhir kontrak wajib untuk karyawan kontrak/magang.");
   }
@@ -307,8 +353,7 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
     const applicant = one<{ id: number; job_opening_id: number; stage: string }>(
       "SELECT id, job_opening_id, stage FROM applicants WHERE id = ?",
       applicantId,
-    );
-    if (applicant && applicant.stage !== "Ditolak") {
+    );    if (applicant && applicant.stage !== "Ditolak") {
       run(
         "UPDATE applicants SET stage = 'Diterima', employee_id = ? WHERE id = ?",
         inserted.lastInsertRowid,
@@ -340,6 +385,14 @@ export async function createEmployeeAction(formData: FormData): Promise<void> {
 
   revalidatePath("/karyawan");
   revalidatePath("/");
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: "hr",
+    action: "employee.create",
+    targetType: "employee",
+    targetId: String(inserted.lastInsertRowid),
+    details: `${nip} · ${fullName}`,
+  });
   ok("/karyawan", `Karyawan ${fullName} (${nip}) berhasil ditambahkan.`);
 }
 
@@ -476,7 +529,7 @@ function insertPayroll(period: string, status: "Draft" | "Final"): number {
 }
 
 export async function createPayrollRunAction(formData: FormData): Promise<void> {
-  await requireRole(["hr"]);
+  const session = await requireRole(["hr"]);
 
   const period = String(formData.get("period") ?? "").trim();
   if (!/^\d{4}-\d{2}$/.test(period)) fail("/payroll", "Format periode tidak valid.");
@@ -490,11 +543,19 @@ export async function createPayrollRunAction(formData: FormData): Promise<void> 
   const runId = insertPayroll(period, "Draft");
 
   revalidatePath("/payroll");
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: "hr",
+    action: "payroll.create",
+    targetType: "payroll_run",
+    targetId: String(runId),
+    details: period,
+  });
   ok(`/payroll/${runId}`, "Payroll draft berhasil dihitung.");
 }
 
 export async function recalculatePayrollAction(formData: FormData): Promise<void> {
-  await requireRole(["hr"]);
+  const session = await requireRole(["hr"]);
   const runId = Number(formData.get("run_id") ?? 0);
   const payrollRun = one<{ id: number; period: string; status: string }>(
     "SELECT id, period, status FROM payroll_runs WHERE id = ?",
@@ -558,11 +619,18 @@ export async function recalculatePayrollAction(formData: FormData): Promise<void
   }
 
   revalidatePath(`/payroll/${runId}`);
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: "hr",
+    action: "payroll.recalculate",
+    targetType: "payroll_run",
+    targetId: String(runId),
+  });
   ok(`/payroll/${runId}`, "Payroll berhasil dihitung ulang.");
 }
 
 export async function finalizePayrollAction(formData: FormData): Promise<void> {
-  await requireRole(["hr"]);
+  const session = await requireRole(["hr"]);
   const runId = Number(formData.get("run_id") ?? 0);
   const payrollRun = one<{ id: number; status: string }>(
     "SELECT id, status FROM payroll_runs WHERE id = ?",
@@ -579,5 +647,12 @@ export async function finalizePayrollAction(formData: FormData): Promise<void> {
 
   revalidatePath(`/payroll/${runId}`);
   revalidatePath("/payroll");
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: "hr",
+    action: "payroll.finalize",
+    targetType: "payroll_run",
+    targetId: String(runId),
+  });
   ok(`/payroll/${runId}`, "Payroll difinalisasi. Slip gaji siap dibagikan.");
 }

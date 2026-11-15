@@ -182,6 +182,36 @@ CREATE INDEX IF NOT EXISTS idx_payslip_run ON payslips (run_id);
 CREATE INDEX IF NOT EXISTS idx_applicant_opening ON applicants (job_opening_id, stage);
 CREATE INDEX IF NOT EXISTS idx_appraisal_cycle ON appraisals (cycle_id, status);
 CREATE INDEX IF NOT EXISTS idx_appraisal_employee ON appraisals (employee_id);
+
+CREATE TABLE IF NOT EXISTS login_attempts (
+  key TEXT PRIMARY KEY,
+  attempts INTEGER NOT NULL DEFAULT 0,
+  first_attempt_at INTEGER NOT NULL,
+  locked_until INTEGER
+);
+
+CREATE TABLE IF NOT EXISTS revoked_sessions (
+  jti TEXT PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  revoked_at INTEGER NOT NULL,
+  expires_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_revoked_sessions_expires ON revoked_sessions (expires_at);
+
+CREATE TABLE IF NOT EXISTS audit_logs (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  actor_user_id INTEGER,
+  actor_role TEXT,
+  action TEXT NOT NULL,
+  target_type TEXT,
+  target_id TEXT,
+  details TEXT,
+  ip TEXT,
+  created_at TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_audit_logs_created ON audit_logs (created_at);
 `;
 
 /** Kolom baru pada payslips untuk perhitungan BPJS/PPh 21 sesuai aturan 2026. */
