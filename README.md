@@ -37,12 +37,47 @@ membuat ulang data demo.
   JKK 0,24% + JKM 0,3% ditanggung perusahaan, PPh 21 TER bulanan (PP 58/2023) serta rekonsiliasi
   setahun pada masa pajak Desember, dan potongan alpha upah ÷ 22; draft → finalisasi; slip gaji
   siap cetak.
+- **Tuning parameter payroll** — tarif & plafon BPJS, biaya jabatan, pembagi alpha, dan ambang
+  pembulatan dapat diganti lewat environment variable tanpa mengubah kode (lihat tabel di bawah).
+- **Rekonsiliasi & kasus khusus** — Desember memakai penghasilan bruto & iuran aktual Jan–Nov
+  (bukan sekadar estimasi x12) untuk PPh 21 setahun; karyawan yang masuk tengah tahun
+  diperlakukan proporsional; PTKP tetap setahun penuh sesuai ketentuan.
 - **Rekrutmen** — lowongan per departemen, pipeline pelamar (Baru → Screening → Interview →
   Penawaran → Diterima/Ditolak), penutupan lowongan otomatis saat kuota terpenuhi, dan konversi
   pelamar diterima menjadi karyawan lewat formulir yang terisi otomatis.
 - **Penilaian kinerja** — siklus penilaian, lima kriteria berbobot (kualitas, produktivitas,
   kerja sama, inisiatif, disiplin), penilaian oleh atasan langsung atau HR, nilai akhir dan
   predikat, serta riwayat penilaian milik karyawan.
+
+### Tuning parameter payroll (environment variable)
+
+Semua parameter punya default sesuai regulasi 2026 dan dapat di-override tanpa mengubah kode:
+
+| Variabel | Default | Keterangan |
+| --- | --- | --- |
+| `PAYROLL_JKN_EMPLOYEE_RATE` | `0.01` | Iuran JKN pekerja (1%) |
+| `PAYROLL_JKN_EMPLOYER_RATE` | `0.04` | Iuran JKN pemberi kerja (4%) |
+| `PAYROLL_JKN_CAP` | `12000000` | Batas upah JKN |
+| `PAYROLL_JHT_EMPLOYEE_RATE` | `0.02` | Iuran JHT pekerja (2%) |
+| `PAYROLL_JHT_EMPLOYER_RATE` | `0.037` | Iuran JHT pemberi kerja (3,7%) |
+| `PAYROLL_JP_EMPLOYEE_RATE` | `0.01` | Iuran JP pekerja (1%) |
+| `PAYROLL_JP_EMPLOYER_RATE` | `0.02` | Iuran JP pemberi kerja (2%) |
+| `PAYROLL_JP_CAP` | `11086300` | Batas upah JP (sejak 1 Mar 2026) |
+| `PAYROLL_JKK_RATE` | `0.0024` | JKK risiko sangat rendah (0,24%) |
+| `PAYROLL_JKM_RATE` | `0.003` | JKM (0,3%) |
+| `PAYROLL_BIAYA_JABATAN_RATE` | `0.05` | Biaya jabatan 5% |
+| `PAYROLL_BIAYA_JABATAN_CAP` | `6000000` | Maksimum biaya jabatan setahun |
+| `PAYROLL_ALPHA_DIVISOR` | `22` | Pembagi potongan hari tanpa keterangan |
+| `PAYROLL_ROUNDING_THRESHOLD` | `0` | Ambang pecahan untuk pembulatan PPh 21 (0 = rupiah penuh) |
+
+## Validasi ahli
+
+Perhitungan demo ini mengikuti tarif resmi 2026, tetapi **belum divalidasi oleh konsultan
+pajak/akuntan publik**. Sebelum dipakai untuk penggajian nyata: (1) validasi klasifikasi risiko
+JKK perusahaan, (2) konfirmasi tarif & plafon JP terkini dari BPJS Ketenagakerjaan, (3) pastikan
+asumsi TER/rekonsiliasi Desember sesuai profil penghasilan karyawan (bonus, THR, lembur tidak
+teratur, natura, karyawan resign/masuk tengah tahun), dan (4) setujui kebijakan pembulatan serta
+dasar upah dengan penasihat pajak.
 
 ## Catatan
 

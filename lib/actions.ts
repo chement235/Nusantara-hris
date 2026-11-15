@@ -403,8 +403,16 @@ function payrollTotals(period: string) {
 
   // PPh 21 yang sudah dipotong pada periode sebelumnya di tahun yang sama,
   // dipakai untuk rekonsiliasi masa pajak terakhir (Desember).
-  const priorRows = all<{ employee_id: number; total: number }>(
-    `SELECT p.employee_id, COALESCE(SUM(p.pph21), 0) AS total
+  const priorRows = all<{
+    employee_id: number;
+    total: number;
+    gross: number;
+    pension: number;
+  }>(
+    `SELECT p.employee_id,
+            COALESCE(SUM(p.pph21), 0) AS total,
+            COALESCE(SUM(p.gross), 0) AS gross,
+            COALESCE(SUM(p.bpjs_jht + p.bpjs_jp), 0) AS pension
      FROM payslips p
      JOIN payroll_runs r ON r.id = p.run_id
      WHERE r.period LIKE ? AND r.period < ?
@@ -415,6 +423,12 @@ function payrollTotals(period: string) {
   const priorWithheld = new Map(
     priorRows.map((row) => [Number(row.employee_id), Number(row.total)]),
   );
+  const priorGross = new Map(
+    priorRows.map((row) => [Number(row.employee_id), Number(row.gross)]),
+  );
+  const priorPension = new Map(
+    priorRows.map((row) => [Number(row.employee_id), Number(row.pension)]),
+  );
 
   const employees = all<{
     id: number;
@@ -422,8 +436,9 @@ function payrollTotals(period: string) {
     allowance_transport: number;
     allowance_meal: number;
     marital_status: string;
+    join_date: string;
   }>(
-    `SELECT id, base_salary, allowance_transport, allowance_meal, marital_status
+    `SELECT id, base_salary, allowance_transport, allowance_meal, marital_status, join_date
      FROM employees WHERE status = 'Aktif' AND join_date <= ? ORDER BY id`,
     end,
   );
@@ -451,6 +466,15 @@ function payrollTotals(period: string) {
     const excused =
       (statuses.get("Cuti") ?? 0) + (statuses.get("Sakit") ?? 0) + (statuses.get("Izin") ?? 0);
     const alpha = Math.max(0, workdays.length - present - excused);
+    // Bulan aktif tahun berjalan (untuk karyawan masuk tengah tahun).
+    const joinedYear = Number(String(employee.join_date).slice(0, 4));
+    const joinedMonth = Number(String(employee.join_date).slice(5, 7));
+    const monthsEmployed =
+      joinedYear < Number(year)
+        ? 12
+        : Math.max(1, 12 - (Number.isFinite(joinedMonth) ? joinedMonth - 1 : 0));
+
+    const isDecember = period.endsWith("-12");
     return {
       employee,
       present,
@@ -459,6 +483,9 @@ function payrollTotals(period: string) {
         alphaDays: alpha,
         period,
         priorWithheld: priorWithheld.get(Number(employee.id)) ?? 0,
+        ytdGross: isDecember ? (priorGross.get(Number(employee.id)) ?? 0) : undefined,
+        ytdPension: isDecember ? (priorPension.get(Number(employee.id)) ?? 0) : undefined,
+        monthsEmployed,
       }),
     };
   });

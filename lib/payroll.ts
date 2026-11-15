@@ -1,4 +1,5 @@
 import { dateRange, monthRange, todayISO } from "./format";
+import { payrollConfig } from "./payroll-config";
 
 export type PayrollEmployee = {
   base_salary: number;
@@ -54,24 +55,24 @@ export const PTKP: Record<string, number> = {
  * - JKM: 0,3%, dibayar pemberi kerja
  */
 export const BPJS = {
-  kesEmployeeRate: 0.01,
-  kesEmployerRate: 0.04,
-  kesCap: 12_000_000,
-  jhtEmployeeRate: 0.02,
-  jhtEmployerRate: 0.037,
-  jpEmployeeRate: 0.01,
-  jpEmployerRate: 0.02,
-  jpCap: 11_086_300,
-  jkkRate: 0.0024,
-  jkmRate: 0.003,
-} as const;
+  get kesEmployeeRate() { return payrollConfig().kesEmployeeRate; },
+  get kesEmployerRate() { return payrollConfig().kesEmployerRate; },
+  get kesCap() { return payrollConfig().kesCap; },
+  get jhtEmployeeRate() { return payrollConfig().jhtEmployeeRate; },
+  get jhtEmployerRate() { return payrollConfig().jhtEmployerRate; },
+  get jpEmployeeRate() { return payrollConfig().jpEmployeeRate; },
+  get jpEmployerRate() { return payrollConfig().jpEmployerRate; },
+  get jpCap() { return payrollConfig().jpCap; },
+  get jkkRate() { return payrollConfig().jkkRate; },
+  get jkmRate() { return payrollConfig().jkmRate; },
+};
 
 /** Biaya jabatan 5% dari bruto setahun, maksimal Rp6.000.000 (PMK 168/2023). */
-export const BIAYA_JABATAN_RATE = 0.05;
-export const BIAYA_JABATAN_CAP = 6_000_000;
+export const BIAYA_JABATAN_RATE = payrollConfig().biayaJabatanRate;
+export const BIAYA_JABATAN_CAP = payrollConfig().biayaJabatanCap;
 
 /** Pembagi potongan hari tanpa keterangan (praktik umum: 22 hari kerja). */
-export const ALPHA_DIVISOR = 22;
+export const ALPHA_DIVISOR = payrollConfig().alphaDivisor;
 
 type TerBracket = readonly [upperBound: number, rate: number];
 
@@ -261,6 +262,17 @@ export type PayslipOptions = {
   period?: string;
   /** PPh 21 yang sudah dipotong Januari–November pada tahun yang sama. */
   priorWithheld?: number;
+  /**
+   * Gross aktual kumulatif sampai akhir bulan sebelumnya (di luar bulan berjalan),
+   * untuk rekonsiliasi Desember berbasis penghasilan riil (bukan estimasi x12).
+   */
+  ytdGross?: number;
+  /**
+   * Iuran pensiun/JHT pekerja aktual kumulatif sampai akhir bulan sebelumnya.
+   */
+  ytdPension?: number;
+  /** Jumlah bulan aktif tahun berjalan (untuk karyawan yang masuk tengah tahun). */
+  monthsEmployed?: number;
 };
 
 /**
@@ -269,10 +281,43 @@ export type PayslipOptions = {
  * - PPh 21 Jan–Nov memakai TER bulanan (PP 58/2023)
  * - PPh 21 Desember memakai penghitungan setahun Pasal 17 dikurangi potongan sebelumnya
  */
+/** Membulatkan PPh 21: rupiah penuh, dengan ambang pembulatan yang dapat di-tuning. */
+export function roundTax(value: number): number {
+  const { roundingThreshold } = payrollConfig();
+  if (roundingThreshold > 0 && value % 1 >= roundingThreshold) {
+    return Math.ceil(value);
+  }
+  return Math.round(value);
+}
+
+/**
+ * Penghasilan kena pajak setahun dengan biaya jabatan (5%, maks Rp6 juta),
+ * pengurang iuran pensiun/JHT pekerja, dan PTKP.
+ */
+export function annualTaxableIncome(
+  ptkpCode: string,
+  annualGross: number,
+  annualPension: number,
+): number {
+  const ptkp = PTKP[ptkpCode] ?? PTKP["TK/0"];
+  const biayaJabatan = Math.min(annualGross * BIAYA_JABATAN_RATE, BIAYA_JABATAN_CAP);
+  return Math.max(0, annualGross - biayaJabatan - annualPension - ptkp);
+}
+
+/** PPh 21 setahun dari penghasilan aktual (untuk rekonsiliasi Desember). */
+export function annualTaxFor(
+  ptkpCode: string,
+  annualGross: number,
+  annualPension: number,
+): number {
+  return roundTax(progressiveTax(annualTaxableIncome(ptkpCode, annualGross, annualPension)));
+}
+
 export function computePayslip(
   employee: PayrollEmployee,
   options: PayslipOptions,
 ): PayslipCalc {
+  const cfg = payrollConfig();
   const base = employee.base_salary;
   const transport = employee.allowance_transport;
   const meal = employee.allowance_meal;
@@ -280,37 +325,44 @@ export function computePayslip(
   const upah = base + transport + meal;
   const gross = upah + overtime;
 
-  const kesBase = Math.min(upah, BPJS.kesCap);
-  const jpBase = Math.min(upah, BPJS.jpCap);
+  const kesBase = Math.min(upah, cfg.kesCap);
+  const jpBase = Math.min(upah, cfg.jpCap);
 
-  const bpjsKes = Math.round(kesBase * BPJS.kesEmployeeRate);
-  const bpjsJht = Math.round(upah * BPJS.jhtEmployeeRate);
-  const bpjsJp = Math.round(jpBase * BPJS.jpEmployeeRate);
-  const bpjsJkk = Math.round(upah * BPJS.jkkRate);
-  const bpjsJkm = Math.round(upah * BPJS.jkmRate);
+  const bpjsKes = Math.round(kesBase * cfg.kesEmployeeRate);
+  const bpjsJht = Math.round(upah * cfg.jhtEmployeeRate);
+  const bpjsJp = Math.round(jpBase * cfg.jpEmployeeRate);
+  const bpjsJkk = Math.round(upah * cfg.jkkRate);
+  const bpjsJkm = Math.round(upah * cfg.jkmRate);
 
-  const employerKes = Math.round(kesBase * BPJS.kesEmployerRate);
-  const employerJht = Math.round(upah * BPJS.jhtEmployerRate);
-  const employerJp = Math.round(jpBase * BPJS.jpEmployerRate);
+  const employerKes = Math.round(kesBase * cfg.kesEmployerRate);
+  const employerJht = Math.round(upah * cfg.jhtEmployerRate);
+  const employerJp = Math.round(jpBase * cfg.jpEmployerRate);
 
-  const alphaDeduction = Math.round((upah / ALPHA_DIVISOR) * Math.max(0, options.alphaDays));
+  const alphaDeduction = Math.round((upah / cfg.alphaDivisor) * Math.max(0, options.alphaDays));
   const otherDeduction = 0;
 
   const ptkp = PTKP[employee.marital_status] ?? PTKP["TK/0"];
   const category = terCategory(employee.marital_status);
   const rate = terRate(employee.marital_status, gross);
 
-  // Estimasi setahun dengan asumsi penghasilan bulanan sama (dipakai untuk Desember).
-  const annualGross = gross * 12;
-  const biayaJabatan = Math.min(annualGross * BIAYA_JABATAN_RATE, BIAYA_JABATAN_CAP);
-  const annualPension = (bpjsJht + bpjsJp) * 12;
-  const annualTaxable = Math.max(0, annualGross - biayaJabatan - annualPension - ptkp);
-  const annualTax = Math.round(progressiveTax(annualTaxable));
-
   const isLastTaxMonth = options.period?.slice(5, 7) === "12";
+  const hasActuals = Number.isFinite(options.ytdGross) && Number.isFinite(options.ytdPension);
+  const months = Math.max(1, Math.min(12, Math.round(options.monthsEmployed ?? 12)));
+
+  // Gross & iuran setahun: pakai aktual kumulatif bila tersedia, jika tidak estimasi bulanan x12
+  // (untuk karyawan yang masuk tengah tahun estimasi disesuaikan dengan jumlah bulan aktif).
+  const annualGross = hasActuals
+    ? gross + (options.ytdGross ?? 0)
+    : gross * months;
+  const annualPension = hasActuals
+    ? (bpjsJht + bpjsJp) + (options.ytdPension ?? 0)
+    : (bpjsJht + bpjsJp) * months;
+  const annualTaxable = annualTaxableIncome(employee.marital_status, annualGross, annualPension);
+  const annualTax = roundTax(progressiveTax(annualTaxable));
+
   const pph21 = isLastTaxMonth
-    ? Math.max(0, annualTax - Math.max(0, Math.round(options.priorWithheld ?? 0)))
-    : Math.round(gross * rate);
+    ? Math.max(0, annualTax - Math.max(0, roundTax(options.priorWithheld ?? 0)))
+    : roundTax(gross * rate);
 
   const totalDeduction =
     bpjsKes + bpjsJht + bpjsJp + pph21 + alphaDeduction + otherDeduction;
