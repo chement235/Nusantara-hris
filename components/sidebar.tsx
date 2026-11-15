@@ -7,7 +7,13 @@ import { ROLE_LABEL, type SessionUser } from "@/lib/types";
 import { initials } from "@/lib/format";
 import { Icon, type IconName } from "./icons";
 
-type NavItem = { href: string; label: string; short: string; icon: IconName };
+type NavItem = {
+  href: string;
+  label: string;
+  short: string;
+  icon: IconName;
+  roles?: SessionUser["role"][];
+};
 
 const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
@@ -20,6 +26,13 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
       { href: "/karyawan", label: "Data Karyawan", short: "Karyawan", icon: "users" as const },
       { href: "/kehadiran", label: "Kehadiran", short: "Absen", icon: "clock" as const },
       { href: "/cuti", label: "Cuti & Izin", short: "Cuti", icon: "calendar" as const },
+      {
+        href: "/tim",
+        label: "Tim Saya",
+        short: "Tim",
+        icon: "target" as const,
+        roles: ["hr", "manager"],
+      },
     ],
   },
   {
@@ -32,6 +45,19 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
   {
     label: "Keuangan",
     items: [{ href: "/payroll", label: "Payroll", short: "Gaji", icon: "wallet" as const }],
+  },
+  {
+    label: "Organisasi",
+    items: [
+      { href: "/organisasi", label: "Struktur Organisasi", short: "Organisasi", icon: "building" as const },
+      {
+        href: "/laporan",
+        label: "Laporan HR",
+        short: "Laporan",
+        icon: "chart" as const,
+        roles: ["hr", "manager"],
+      },
+    ],
   },
 ];
 
@@ -55,13 +81,16 @@ export function Sidebar({ user }: { user: SessionUser }) {
       </div>
 
       <nav className="flex-1 space-y-6 overflow-y-auto px-3 pb-6">
-        {SECTIONS.map((section) => (
+        {SECTIONS.map((section) => {
+          const items = section.items.filter((item) => !item.roles || item.roles.includes(user.role));
+          if (items.length === 0) return null;
+          return (
           <div key={section.label}>
             <p className="px-3 pb-2 text-[10px] font-semibold uppercase tracking-widest text-slate-500">
               {section.label}
             </p>
             <ul className="space-y-1">
-              {section.items.map((item) => (
+              {items.map((item) => (
                 <li key={item.href}>
                   <Link
                     href={item.href}
@@ -74,7 +103,8 @@ export function Sidebar({ user }: { user: SessionUser }) {
               ))}
             </ul>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="border-t border-white/10 p-3">
@@ -140,6 +170,9 @@ const BOTTOM_MORE: NavItem[] = [
   { href: "/payroll", label: "Payroll & slip gaji", short: "Payroll", icon: "wallet" as const },
   { href: "/rekrutmen", label: "Rekrutmen", short: "Rekrutmen", icon: "briefcase" as const },
   { href: "/kinerja", label: "Penilaian kinerja", short: "Kinerja", icon: "check" as const },
+  { href: "/tim", label: "Tim saya", short: "Tim", icon: "target" as const },
+  { href: "/organisasi", label: "Struktur organisasi", short: "Organisasi", icon: "building" as const },
+  { href: "/laporan", label: "Laporan HR", short: "Laporan", icon: "chart" as const },
 ];
 
 export function MobileBottomNav({ user }: { user: SessionUser }) {

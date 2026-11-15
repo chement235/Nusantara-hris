@@ -138,6 +138,9 @@ export default async function PayrollPage({
         <Link href="/karyawan" className="btn btn-ghost">
           Data karyawan
         </Link>
+        <Link href="/payroll/analitik" className="btn btn-ghost">
+          Analitik
+        </Link>
       </PageHeader>
 
       {params.ok && (

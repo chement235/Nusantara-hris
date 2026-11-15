@@ -85,7 +85,17 @@ export function StatCard({
   label: string;
   value: ReactNode;
   hint?: ReactNode;
-  icon: "users" | "clock" | "calendar" | "wallet" | "briefcase" | "check";
+  icon:
+    | "users"
+    | "clock"
+    | "calendar"
+    | "wallet"
+    | "briefcase"
+    | "check"
+    | "chart"
+    | "building"
+    | "layers"
+    | "target";
   tone?: Tone;
 }) {
   return (

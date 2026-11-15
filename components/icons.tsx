@@ -14,7 +14,11 @@ export type IconName =
   | "briefcase"
   | "download"
   | "print"
-  | "user";
+  | "user"
+  | "chart"
+  | "building"
+  | "layers"
+  | "target";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -92,6 +96,32 @@ const PATHS: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" />
+    </>
+  ),
+  chart: (
+    <>
+      <path d="M3 3v18h18" />
+      <path d="M7 15v4M12 9v10M17 13v6" />
+    </>
+  ),
+  building: (
+    <>
+      <rect x="4" y="3" width="16" height="18" rx="2" />
+      <path d="M9 21v-4h6v4M8 7h2M8 11h2M8 15h2M14 7h2M14 11h2M14 15h2" />
+    </>
+  ),
+  layers: (
+    <>
+      <path d="m12 2 9 5-9 5-9-5 9-5Z" />
+      <path d="m3 12 9 5 9-5" />
+      <path d="m3 17 9 5 9-5" />
+    </>
+  ),
+  target: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <circle cx="12" cy="12" r="5" />
+      <circle cx="12" cy="12" r="1" />
     </>
   ),
 };
