@@ -42,6 +42,16 @@ export default async function PayrollDetailPage({
     (acc, slip) => acc + Number(slip.bpjs_kes) + Number(slip.bpjs_jht) + Number(slip.bpjs_jp),
     0,
   );
+  const employerCost = slips.reduce(
+    (acc, slip) =>
+      acc +
+      Number(slip.employer_kes) +
+      Number(slip.employer_jht) +
+      Number(slip.employer_jp) +
+      Number(slip.bpjs_jkk) +
+      Number(slip.bpjs_jkm),
+    0,
+  );
 
   return (
     <>
@@ -70,7 +80,12 @@ export default async function PayrollDetailPage({
             </form>
           </>
         ) : (
-          <Badge tone="emerald">Final</Badge>
+          <>
+            <Badge tone="emerald">Final</Badge>
+            <a href={`/api/export/payroll/${payrollRun.id}`} className="btn btn-ghost">
+              Unduh file transfer
+            </a>
+          </>
         )}
       </PageHeader>
 
@@ -172,6 +187,43 @@ export default async function PayrollDetailPage({
             </table>
           </div>
         )}
+      </Card>
+
+      <Card className="mt-5">
+        <CardHeader
+          title="Beban perusahaan (di luar take home pay)"
+          subtitle="Kontribusi BPJS pemberi kerja dan jaminan sosial pada periode ini"
+        />
+        <div className="grid gap-4 p-5 sm:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] text-slate-500">JKN 4%</p>
+            <p className="text-base font-semibold text-slate-900">
+              {rupiah(slips.reduce((acc, s) => acc + Number(s.employer_kes), 0))}
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] text-slate-500">JHT 3,7%</p>
+            <p className="text-base font-semibold text-slate-900">
+              {rupiah(slips.reduce((acc, s) => acc + Number(s.employer_jht), 0))}
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] text-slate-500">JP 2%</p>
+            <p className="text-base font-semibold text-slate-900">
+              {rupiah(slips.reduce((acc, s) => acc + Number(s.employer_jp), 0))}
+            </p>
+          </div>
+          <div className="rounded-xl bg-slate-50 px-4 py-3">
+            <p className="text-[11px] text-slate-500">JKK + JKM</p>
+            <p className="text-base font-semibold text-slate-900">
+              {rupiah(slips.reduce((acc, s) => acc + Number(s.bpjs_jkk) + Number(s.bpjs_jkm), 0))}
+            </p>
+          </div>
+          <div className="rounded-xl bg-indigo-50 px-4 py-3">
+            <p className="text-[11px] text-indigo-600">Total beban perusahaan</p>
+            <p className="text-base font-semibold text-indigo-900">{rupiah(employerCost)}</p>
+          </div>
+        </div>
       </Card>
 
       <p className="mt-3 text-xs leading-relaxed text-slate-500">

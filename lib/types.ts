@@ -48,6 +48,8 @@ export type EmployeeRow = {
   birth_date: string | null;
   address: string | null;
   marital_status: string;
+  emergency_name: string | null;
+  emergency_phone: string | null;
 };
 
 export type AttendanceRow = {

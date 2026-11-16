@@ -66,6 +66,9 @@ export default async function ReportsPage() {
         <Link href="/organisasi" className="btn btn-ghost">
           Struktur organisasi
         </Link>
+        <a href="/api/export/karyawan" className="btn btn-primary">
+          Unduh data karyawan (CSV)
+        </a>
       </PageHeader>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

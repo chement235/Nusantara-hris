@@ -1,9 +1,21 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { Avatar, Badge, Card, CardHeader, EmptyState, PageHeader, StatCard } from "@/components/ui";
+import { decideLeaveAction } from "@/lib/actions";
 import { requireSession } from "@/lib/auth";
 import { all } from "@/lib/db";
-import { monthLabel, todayISO } from "@/lib/format";
+import { dateID, monthLabel, todayISO } from "@/lib/format";
+
+type PendingLeave = {
+  id: number;
+  employee_name: string;
+  department_name: string;
+  leave_type_name: string;
+  start_date: string;
+  end_date: string;
+  days: number;
+  reason: string;
+};
 
 type TeamMember = {
   id: number;
@@ -74,6 +86,19 @@ export default async function TeamPage() {
           session.employeeId,
         );
 
+  const pendingLeaves = all<PendingLeave>(
+    `SELECT lr.id, e.full_name AS employee_name, d.name AS department_name,
+            lt.name AS leave_type_name, lr.start_date, lr.end_date, lr.days, lr.reason
+     FROM leave_requests lr
+     JOIN employees e ON e.id = lr.employee_id
+     JOIN departments d ON d.id = e.department_id
+     JOIN leave_types lt ON lt.id = lr.leave_type_id
+     WHERE lr.status = 'Menunggu' AND (? = 'hr' OR e.manager_id = ?)
+     ORDER BY lr.start_date`,
+    session.role,
+    session.employeeId,
+  );
+
   const presentTotal = list.reduce((acc, m) => acc + Number(m.present), 0);
   const lateTotal = list.reduce((acc, m) => acc + Number(m.late), 0);
   const pendingLeaveTotal = list.reduce((acc, m) => acc + Number(m.pending_leave), 0);
@@ -118,6 +143,43 @@ export default async function TeamPage() {
           tone="violet"
         />
       </div>
+
+      {pendingLeaves.length > 0 && (
+        <Card className="mt-5">
+          <CardHeader
+            title="Persetujuan cuti tim"
+            subtitle={session.role === "hr" ? "Semua pengajuan yang menunggu" : "Pengajuan anggota tim langsung"}
+            action={<Badge tone="amber">{pendingLeaves.length} menunggu</Badge>}
+          />
+          <ul className="divide-y divide-slate-100">
+            {pendingLeaves.map((request) => (
+              <li key={request.id} className="flex flex-wrap items-start justify-between gap-3 px-5 py-4">
+                <div className="flex min-w-0 items-start gap-3">
+                  <Avatar name={request.employee_name} />
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-slate-900">{request.employee_name}</p>
+                    <p className="text-[11px] text-slate-500">
+                      {request.department_name} · {request.leave_type_name} ·{" "}
+                      {dateID(request.start_date)} – {dateID(request.end_date)} ({request.days} hari)
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">{request.reason}</p>
+                  </div>
+                </div>
+                <form action={decideLeaveAction} className="flex w-full items-center gap-2 sm:w-auto">
+                  <input type="hidden" name="request_id" value={request.id} />
+                  <input name="note" className="input py-1.5 text-xs" placeholder="Catatan (opsional)" />
+                  <button type="submit" name="decision" value="Disetujui" className="btn btn-success btn-sm">
+                    Setujui
+                  </button>
+                  <button type="submit" name="decision" value="Ditolak" className="btn btn-danger btn-sm">
+                    Tolak
+                  </button>
+                </form>
+              </li>
+            ))}
+          </ul>
+        </Card>
+      )}
 
       <Card className="mt-5">
         <CardHeader

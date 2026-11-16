@@ -404,3 +404,38 @@ export function periodWorkdays(period: string): string[] {
     return day !== 0 && day !== 6;
   });
 }
+
+export type ThrEmployee = {
+  base_salary: number;
+  allowance_transport: number;
+  allowance_meal: number;
+  join_date: string;
+};
+
+export type ThrCalc = {
+  monthly_wage: number;
+  months_worked: number;
+  prorated: boolean;
+  amount: number;
+};
+
+/** Lama bekerja dalam bulan penuh (bulan mulai dihitung sebagai 1 bulan). */
+export function monthsWorked(joinDate: string, asOf: string = todayISO()): number {
+  const [joinYear, joinMonth] = joinDate.slice(0, 7).split("-").map(Number);
+  const [asOfYear, asOfMonth] = asOf.slice(0, 7).split("-").map(Number);
+  if (!joinYear || !joinMonth || !asOfYear || !asOfMonth) return 0;
+  return Math.max(0, (asOfYear - joinYear) * 12 + (asOfMonth - joinMonth) + 1);
+}
+
+/**
+ * THR keagamaan (UU 13/2003 jo. Permenaker 6/2016):
+ * - bekerja >= 12 bulan: 1 bulan upah penuh (pokok + tunjangan tetap);
+ * - bekerja 1–11 bulan: proporsional (bulan kerja ÷ 12 × upah sebulan).
+ */
+export function thrFor(employee: ThrEmployee, asOf: string = todayISO()): ThrCalc {
+  const monthlyWage = employee.base_salary + employee.allowance_transport + employee.allowance_meal;
+  const months = Math.min(12, monthsWorked(employee.join_date, asOf));
+  const prorated = months < 12;
+  const amount = Math.round((monthlyWage * months) / 12);
+  return { monthly_wage: monthlyWage, months_worked: months, prorated, amount };
+}

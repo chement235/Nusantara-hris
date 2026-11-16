@@ -2,9 +2,11 @@ import { describe, it } from "node:test";
 import assert from "node:assert/strict";
 import {
   computePayslip,
+  monthsWorked,
   progressiveTax,
   terCategory,
   terRate,
+  thrFor,
   annualTaxableIncome,
 } from "../lib/payroll";
 
@@ -83,6 +85,34 @@ describe("payroll 2026 — rekonsiliasi & kasus khusus", () => {
       monthsEmployed: 12,
     });
     assert.ok(mid.pph21_annual < full.pph21_annual);
+  });
+});
+
+describe("THR keagamaan", () => {
+  const employee = {
+    base_salary: 12_000_000,
+    allowance_transport: 1_000_000,
+    allowance_meal: 500_000,
+    join_date: "2024-05-01",
+  };
+
+  it("12 bulan atau lebih menerima satu bulan upah penuh", () => {
+    const calc = thrFor(employee, "2026-11-16");
+    assert.equal(calc.monthly_wage, 13_500_000);
+    assert.equal(calc.prorated, false);
+    assert.equal(calc.amount, 13_500_000);
+  });
+
+  it("masa kerja kurang dari 12 bulan diprorata", () => {
+    const calc = thrFor({ ...employee, join_date: "2026-06-01" }, "2026-11-16");
+    assert.equal(calc.months_worked, 6);
+    assert.equal(calc.prorated, true);
+    assert.equal(calc.amount, Math.round((13_500_000 * 6) / 12));
+  });
+
+  it("menghitung bulan kerja termasuk bulan mulai", () => {
+    assert.equal(monthsWorked("2026-11-10", "2026-11-16"), 1);
+    assert.equal(monthsWorked("2026-01-15", "2026-11-16"), 11);
   });
 });
 

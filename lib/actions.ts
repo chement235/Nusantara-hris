@@ -92,6 +92,42 @@ export async function clockOutAction(): Promise<void> {
   ok("/kehadiran", `Absen pulang tercatat pukul ${time} WIB.`);
 }
 
+export async function updateMyProfileAction(formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const phone = String(formData.get("phone") ?? "").trim();
+  const address = String(formData.get("address") ?? "").trim();
+  const emergencyName = String(formData.get("emergency_name") ?? "").trim();
+  const emergencyPhone = String(formData.get("emergency_phone") ?? "").trim();
+
+  if (phone.length > 30) fail("/profil-saya", "Nomor telepon maksimal 30 karakter.");
+  if (address.length > 300) fail("/profil-saya", "Alamat maksimal 300 karakter.");
+  if (emergencyName.length > 100) fail("/profil-saya", "Nama kontak darurat maksimal 100 karakter.");
+  if (emergencyPhone.length > 30) fail("/profil-saya", "Telepon darurat maksimal 30 karakter.");
+
+  run(
+    `UPDATE employees
+     SET phone = ?, address = ?, emergency_name = ?, emergency_phone = ?
+     WHERE id = ?`,
+    phone || null,
+    address || null,
+    emergencyName || null,
+    emergencyPhone || null,
+    session.employeeId,
+  );
+
+  revalidatePath("/profil-saya");
+  revalidatePath(`/karyawan/${session.employeeId}`);
+  auditLog({
+    actorUserId: session.userId,
+    actorRole: session.role,
+    action: "employee.profile.self_update",
+    targetType: "employee",
+    targetId: String(session.employeeId),
+    details: "pembaruan kontak pribadi & darurat via ESS",
+  });
+  ok("/profil-saya", "Profil Anda berhasil diperbarui.");
+}
+
 export async function requestLeaveAction(formData: FormData): Promise<void> {
   const session = await requireSession();
   const leaveTypeId = Number(formData.get("leave_type_id") ?? 0);

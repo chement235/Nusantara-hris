@@ -48,6 +48,19 @@ membuat ulang data demo.
 - **Penilaian kinerja** — siklus penilaian, lima kriteria berbobot (kualitas, produktivitas,
   kerja sama, inisiatif, disiplin), penilaian oleh atasan langsung atau HR, nilai akhir dan
   predikat, serta riwayat penilaian milik karyawan.
+- **Matriks talent 9-Box** — peta kinerja (nilai akhir) vs potensi (skor kriteria Inisiatif
+  penilaian terakhir) dengan sembilan kuadran (Bintang, Potensi Tinggi, Inti, dst).
+- **ESS — Profil Saya** — karyawan memperbarui sendiri nomor telepon, alamat, dan kontak darurat
+  (tercatat di audit trail); rekening & NPWP tetap hanya dapat diubah HR.
+- **MSS — Tim Saya** — rekap absensi/cuti/penilaian anggota tim dan persetujuan cuti langsung
+  dari halaman tim tanpa membuka modul cuti.
+- **Payroll lanjutan** — estimasi THR keagamaan (UU 13/2003 jo. Permenaker 6/2016: 1 bulan upah
+  penuh untuk >= 12 bulan, proporsional untuk 1–11 bulan), rincian beban BPJS pemberi kerja,
+  dan unduhan file transfer bank (CSV) per periode payroll final.
+- **Organisasi** — direktori departemen dan garis pelaporan, plus halaman detail per departemen
+  (anggota, jenjang, dan beban kompensasi).
+- **Laporan & ekspor** — ringkasan headcount/kehadiran/cuti/payroll/talent, dengan ekspor CSV
+  direktori karyawan, THR, dan file transfer payroll.
 
 ### Tuning parameter payroll (environment variable)
 

@@ -18,7 +18,9 @@ export type IconName =
   | "chart"
   | "building"
   | "layers"
-  | "target";
+  | "target"
+  | "gift"
+  | "grid";
 
 const PATHS: Record<IconName, React.ReactNode> = {
   dashboard: (
@@ -122,6 +124,21 @@ const PATHS: Record<IconName, React.ReactNode> = {
       <circle cx="12" cy="12" r="9" />
       <circle cx="12" cy="12" r="5" />
       <circle cx="12" cy="12" r="1" />
+    </>
+  ),
+  gift: (
+    <>
+      <rect x="3" y="8" width="18" height="4" />
+      <path d="M5 12v9h14v-9M12 8v13" />
+      <path d="M12 8s-1.5-5-4.5-4S12 8 12 8Zm0 0s1.5-5 4.5-4S12 8 12 8Z" />
+    </>
+  ),
+  grid: (
+    <>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <rect x="14" y="14" width="7" height="7" rx="1.5" />
     </>
   ),
 };

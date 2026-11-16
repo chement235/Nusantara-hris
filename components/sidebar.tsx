@@ -24,6 +24,7 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     label: "Kepegawaian",
     items: [
       { href: "/karyawan", label: "Data Karyawan", short: "Karyawan", icon: "users" as const },
+      { href: "/profil-saya", label: "Profil Saya", short: "Profil", icon: "user" as const },
       { href: "/kehadiran", label: "Kehadiran", short: "Absen", icon: "clock" as const },
       { href: "/cuti", label: "Cuti & Izin", short: "Cuti", icon: "calendar" as const },
       {
@@ -40,11 +41,27 @@ const SECTIONS: { label: string; items: NavItem[] }[] = [
     items: [
       { href: "/rekrutmen", label: "Rekrutmen", short: "Rekrutmen", icon: "briefcase" as const },
       { href: "/kinerja", label: "Penilaian Kinerja", short: "Kinerja", icon: "check" as const },
+      {
+        href: "/kinerja/9box",
+        label: "Matriks 9-Box",
+        short: "9-Box",
+        icon: "grid" as const,
+        roles: ["hr", "manager"],
+      },
     ],
   },
   {
     label: "Keuangan",
-    items: [{ href: "/payroll", label: "Payroll", short: "Gaji", icon: "wallet" as const }],
+    items: [
+      { href: "/payroll", label: "Payroll", short: "Gaji", icon: "wallet" as const },
+      {
+        href: "/payroll/thr",
+        label: "THR Keagamaan",
+        short: "THR",
+        icon: "gift" as const,
+        roles: ["hr"],
+      },
+    ],
   },
   {
     label: "Organisasi",
@@ -168,8 +185,10 @@ const BOTTOM_PRIMARY: NavItem[] = [
 
 const BOTTOM_MORE: NavItem[] = [
   { href: "/payroll", label: "Payroll & slip gaji", short: "Payroll", icon: "wallet" as const },
+  { href: "/payroll/thr", label: "THR keagamaan", short: "THR", icon: "gift" as const },
   { href: "/rekrutmen", label: "Rekrutmen", short: "Rekrutmen", icon: "briefcase" as const },
   { href: "/kinerja", label: "Penilaian kinerja", short: "Kinerja", icon: "check" as const },
+  { href: "/kinerja/9box", label: "Matriks 9-Box", short: "9-Box", icon: "grid" as const },
   { href: "/tim", label: "Tim saya", short: "Tim", icon: "target" as const },
   { href: "/organisasi", label: "Struktur organisasi", short: "Organisasi", icon: "building" as const },
   { href: "/laporan", label: "Laporan HR", short: "Laporan", icon: "chart" as const },

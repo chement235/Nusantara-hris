@@ -122,7 +122,12 @@ export default async function OrganizationPage() {
               <li key={dept.id} className="px-5 py-3.5">
                 <div className="flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-slate-900">{dept.name}</p>
+                    <Link
+                      href={`/organisasi/${dept.id}`}
+                      className="text-sm font-medium text-slate-900 hover:text-indigo-600"
+                    >
+                      {dept.name}
+                    </Link>
                     <p className="text-[11px] text-slate-500">
                       {dept.head ? `Kepala: ${dept.head}` : "Tanpa kepala terdaftar"}
                     </p>
@@ -179,7 +184,14 @@ export default async function OrganizationPage() {
             <tbody className="divide-y divide-slate-100">
               {departments.map((dept) => (
                 <tr key={dept.id} className="hover:bg-slate-50/60">
-                  <td className="td font-medium text-slate-900">{dept.name}</td>
+                  <td className="td">
+                    <Link
+                      href={`/organisasi/${dept.id}`}
+                      className="font-medium text-slate-900 hover:text-indigo-600"
+                    >
+                      {dept.name}
+                    </Link>
+                  </td>
                   <td className="td font-mono text-xs text-slate-500">{dept.code}</td>
                   <td className="td text-slate-600">{dept.total}</td>
                   <td className="td text-slate-600">{dept.active}</td>

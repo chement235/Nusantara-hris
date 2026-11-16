@@ -225,14 +225,29 @@ const PAYSLIP_MIGRATIONS: [column: string, definition: string][] = [
   ["employer_jp", "INTEGER NOT NULL DEFAULT 0"],
 ];
 
+/** Kolom tambahan untuk ESS (kontak darurat) pada profil karyawan. */
+const EMPLOYEE_MIGRATIONS: [column: string, definition: string][] = [
+  ["emergency_name", "TEXT"],
+  ["emergency_phone", "TEXT"],
+];
+
 function migrate(connection: DatabaseSync): void {
-  const columns = connection.prepare("PRAGMA table_info(payslips)").all() as unknown as {
+  const payslipColumns = connection.prepare("PRAGMA table_info(payslips)").all() as unknown as {
     name: string;
   }[];
-  const existing = new Set(columns.map((column) => column.name));
+  const payslipExisting = new Set(payslipColumns.map((column) => column.name));
   for (const [column, definition] of PAYSLIP_MIGRATIONS) {
-    if (existing.has(column)) continue;
+    if (payslipExisting.has(column)) continue;
     connection.exec(`ALTER TABLE payslips ADD COLUMN ${column} ${definition}`);
+  }
+
+  const employeeColumns = connection.prepare("PRAGMA table_info(employees)").all() as unknown as {
+    name: string;
+  }[];
+  const employeeExisting = new Set(employeeColumns.map((column) => column.name));
+  for (const [column, definition] of EMPLOYEE_MIGRATIONS) {
+    if (employeeExisting.has(column)) continue;
+    connection.exec(`ALTER TABLE employees ADD COLUMN ${column} ${definition}`);
   }
 }
 
